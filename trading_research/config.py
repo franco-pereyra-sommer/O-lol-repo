@@ -1,0 +1,207 @@
+"""
+Configuración centralizada del proyecto.
+
+TODOS los parámetros que afectan los resultados viven acá. Ningún otro módulo
+define números "mágicos": los reciben a través de un objeto `ResearchConfig`.
+
+La configuración completa se guarda junto con los resultados de cada corrida
+(ver `search.save_results`), de modo que una búsqueda pueda reproducirse.
+"""
+from __future__ import annotations
+
+import dataclasses
+import json
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
+
+
+class PositionSide(str, Enum):
+    """Lado de la posición. SHORT queda declarado pero no implementado."""
+    LONG = "LONG"
+    SHORT = "SHORT"
+
+
+@dataclass
+class ResearchConfig:
+    # ------------------------------------------------------------------ #
+    # Activo / temporalidad / fuente de datos
+    # ------------------------------------------------------------------ #
+    ASSET: str = "BTC"
+    TIMEFRAME: str = "1h"
+    POSITION_TYPE: str = PositionSide.LONG.value
+    DATA_SOURCE: str = "yfinance"          # "yfinance" | "csv"
+    CSV_PATH: str | None = None            # usado si DATA_SOURCE == "csv"
+    # yfinance sólo entrega ~730 días de velas de 1h. "max" se traduce al
+    # máximo permitido por la temporalidad dentro de data.YFinanceDataSource.
+    YF_PERIOD: str = "max"
+
+    # ------------------------------------------------------------------ #
+    # División cronológica TRAIN → VALIDATION → TEST
+    # ------------------------------------------------------------------ #
+    TRAIN_FRACTION: float = 0.60
+    VALIDATION_FRACTION: float = 0.20
+    TEST_FRACTION: float = 0.20
+    # El TEST sólo se evalúa si se pide explícitamente (una sola vez, al final).
+    RUN_TEST_EVALUATION: bool = False
+
+    # ------------------------------------------------------------------ #
+    # Indicadores: rangos de parámetros que el generador puede explorar
+    # (límites inclusivos)
+    # ------------------------------------------------------------------ #
+    SMA_PERIOD_RANGE: tuple[int, int] = (5, 200)
+    EMA_PERIOD_RANGE: tuple[int, int] = (5, 200)
+    RSI_PERIOD_RANGE: tuple[int, int] = (5, 30)
+    ATR_PERIOD_RANGE: tuple[int, int] = (5, 30)
+    MACD_FAST_RANGE: tuple[int, int] = (5, 20)
+    MACD_SLOW_RANGE: tuple[int, int] = (21, 50)
+    MACD_SIGNAL_RANGE: tuple[int, int] = (5, 15)
+    # Períodos n para R_n(t) = Close(t)/Close(t-n) - 1
+    RETURN_PERIODS: tuple[int, ...] = (1, 2, 3, 5, 10, 20, 50)
+
+    # ------------------------------------------------------------------ #
+    # Generación de condiciones
+    # ------------------------------------------------------------------ #
+    RANDOM_SEED: int = 42
+    N_SIMPLE_CONDITIONS: int = 400
+    N_COMPLEX_CONDITIONS: int = 400
+    MAX_CONDITION_DEPTH: int = 1
+    # Cuántas condiciones simples "informativas" de la etapa 1 se usan como
+    # bloques para la etapa 2.
+    STAGE2_POOL_SIZE: int = 40
+    # Una condición simple es "informativa" si supera el filtro de cantidad de
+    # casos Y mejora la línea base (todas las velas como entrada) en al menos
+    # alguna de estas diferencias absolutas:
+    STAGE2_MIN_P_TP_LIFT: float = 0.0
+    STAGE2_MIN_MEAN_RETURN_LIFT: float = 0.0
+    # Los umbrales numéricos de las condiciones se sortean entre estos
+    # cuantiles de la distribución del operando en TRAIN (nunca VALID/TEST).
+    THRESHOLD_QUANTILE_RANGE: tuple[float, float] = (0.05, 0.95)
+    # Cifras significativas al redondear umbrales (legibilidad).
+    THRESHOLD_SIGNIFICANT_DIGITS: int = 3
+    # Probabilidades relativas de cada tipo de condición simple.
+    SIMPLE_KIND_WEIGHTS: dict[str, float] = field(default_factory=lambda: {
+        "compare_const": 0.40,
+        "compare_operand": 0.30,
+        "cross_const": 0.15,
+        "cross_operand": 0.15,
+    })
+    # Probabilidades relativas de cada operador en la etapa 2.
+    COMPLEX_OPERATOR_WEIGHTS: dict[str, float] = field(default_factory=lambda: {
+        "AND": 0.40,
+        "OR": 0.15,
+        "NOT": 0.10,
+        "THEN": 0.20,
+        "WITHIN_AND": 0.15,
+    })
+    # Ventana N (velas) para "A THEN B within N" y "A occurred within N".
+    TEMPORAL_WINDOW_RANGE: tuple[int, int] = (2, 20)
+
+    # ------------------------------------------------------------------ #
+    # Entradas
+    # ------------------------------------------------------------------ #
+    # Cooldown entre entradas de la MISMA condición (en velas). Una señal en t
+    # se acepta sólo si la última entrada aceptada de esa condición fue en una
+    # vela <= t - MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES.
+    MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES: int = 10
+
+    # ------------------------------------------------------------------ #
+    # Evaluación posterior a la entrada
+    # ------------------------------------------------------------------ #
+    MAX_HOLDING_BARS: int = 30
+    TP_PERCENT: float = 0.05
+    SL_PERCENT: float = 0.02
+    # Qué retorno asignar a un caso AMBIGUOUS (TP y SL en la misma vela):
+    #   "worst"   -> se asume SL (conservador)
+    #   "best"    -> se asume TP (optimista, sólo para análisis de sensibilidad)
+    #   "midpoint"-> promedio de ambos
+    # La CLASIFICACIÓN siempre queda como AMBIGUOUS; esto sólo afecta el retorno.
+    AMBIGUOUS_RETURN_POLICY: str = "worst"
+
+    # Umbrales para P(MFE >= x) y P(MAE <= -x)
+    MFE_THRESHOLDS: tuple[float, ...] = (0.01, 0.02, 0.05, 0.10)
+    MAE_THRESHOLDS: tuple[float, ...] = (0.01, 0.02, 0.05)
+    QUANTILES: tuple[float, ...] = (0.10, 0.25, 0.50, 0.75, 0.90)
+
+    # Condiciones favorables generales (sección 20). Cada dict:
+    #   {"type": "reach",      "p": 0.03, "bars": 10}
+    #   {"type": "at_horizon", "p": 0.02, "bars": 10}
+    #   {"type": "down_then_up", "p1": 0.01, "p2": 0.03}
+    #   {"type": "up_then_down", "p1": 0.02, "p2": 0.02}
+    # "bars" debe ser <= MAX_HOLDING_BARS; las secuencias usan todo el horizonte.
+    FAVORABLE_OUTCOMES: tuple[dict[str, Any], ...] = (
+        {"type": "reach", "p": 0.02, "bars": 10},
+        {"type": "reach", "p": 0.05, "bars": 30},
+        {"type": "at_horizon", "p": 0.0, "bars": 10},
+        {"type": "at_horizon", "p": 0.02, "bars": 30},
+        {"type": "down_then_up", "p1": 0.01, "p2": 0.03},
+        {"type": "up_then_down", "p1": 0.02, "p2": 0.02},
+    )
+
+    # ------------------------------------------------------------------ #
+    # Costos simulados (fracciones, p. ej. 0.001 = 0.1 %)
+    # ------------------------------------------------------------------ #
+    # COMMISSION_RATE: comisión del exchange cobrada sobre el nocional en
+    #   CADA lado (entrada y salida).
+    # SLIPPAGE_RATE: desplazamiento adverso del precio de ejecución respecto
+    #   del precio teórico, en CADA lado (impacto/latencia).
+    # SPREAD_RATE: spread bid-ask COMPLETO relativo al precio medio. Se paga
+    #   medio spread al entrar y medio spread al salir.
+    COMMISSION_RATE: float = 0.001
+    SLIPPAGE_RATE: float = 0.0005
+    SPREAD_RATE: float = 0.0002
+
+    # ------------------------------------------------------------------ #
+    # Filtros
+    # ------------------------------------------------------------------ #
+    MIN_CASES_FRACTION: float = 0.01   # filtro de frecuencia, NO de significancia
+    MIN_CASES_ABSOLUTE: int = 30
+    # Referencia: con TP=5 %, SL=2 % y 30 velas, la línea base de BTC 1h
+    # (todas las velas como entrada, 2024-2025) dio P(TP_FIRST) ≈ 0.10 en TRAIN.
+    # Comparar siempre contra la línea base que imprime cada corrida.
+    MIN_P_TP_FIRST: float = 0.15
+    # "net" o "gross": qué retorno medio debe ser > MIN_EXPECTED_RETURN
+    EXPECTED_RETURN_BASIS: str = "net"
+    MIN_EXPECTED_RETURN: float = 0.0
+
+    # ------------------------------------------------------------------ #
+    # Salida
+    # ------------------------------------------------------------------ #
+    OUTPUT_DIR: str = "results"
+    SAVE_EVENTS: bool = True
+
+    # ------------------------------------------------------------------ #
+    def validate(self) -> None:
+        total = self.TRAIN_FRACTION + self.VALIDATION_FRACTION + self.TEST_FRACTION
+        if abs(total - 1.0) > 1e-9:
+            raise ValueError(f"TRAIN+VALIDATION+TEST debe sumar 1 (suma {total}).")
+        if self.POSITION_TYPE != PositionSide.LONG.value:
+            raise NotImplementedError("Sólo LONG está implementado en esta versión.")
+        if self.MAX_CONDITION_DEPTH < 1:
+            raise ValueError("MAX_CONDITION_DEPTH debe ser >= 1.")
+        if self.AMBIGUOUS_RETURN_POLICY not in ("worst", "best", "midpoint"):
+            raise ValueError("AMBIGUOUS_RETURN_POLICY inválida.")
+        if self.EXPECTED_RETURN_BASIS not in ("net", "gross"):
+            raise ValueError("EXPECTED_RETURN_BASIS debe ser 'net' o 'gross'.")
+        for fo in self.FAVORABLE_OUTCOMES:
+            if fo.get("bars", 0) > self.MAX_HOLDING_BARS:
+                raise ValueError(f"{fo}: 'bars' > MAX_HOLDING_BARS.")
+        if self.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES < 0:
+            raise ValueError("El cooldown no puede ser negativo.")
+
+    def to_dict(self) -> dict[str, Any]:
+        return json.loads(json.dumps(dataclasses.asdict(self), default=list))
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "ResearchConfig":
+        names = {f.name: f for f in dataclasses.fields(cls)}
+        kwargs = {}
+        for k, v in d.items():
+            if k not in names:
+                continue
+            if isinstance(v, list) and k != "FAVORABLE_OUTCOMES":
+                v = tuple(v)
+            elif k == "FAVORABLE_OUTCOMES":
+                v = tuple(v)
+            kwargs[k] = v
+        return cls(**kwargs)
