@@ -57,11 +57,17 @@ class SearchResult:
 
 
 class ResearchPipeline:
-    def __init__(self, cfg: ResearchConfig, df: pd.DataFrame | None = None):
+    def __init__(self, cfg: ResearchConfig, df: pd.DataFrame | None = None,
+                 store: FeatureStore | None = None):
+        """
+        `store` permite reutilizar indicadores/señales ya calculados entre
+        corridas sobre los MISMOS datos (p. ej. una grilla de TP/SL): las
+        señales de entrada no dependen de TP, SL ni horizonte.
+        """
         cfg.validate()
         self.cfg = cfg
         self.df = df if df is not None else load_data(cfg)
-        self.store = FeatureStore(self.df)
+        self.store = store if store is not None and store.df is self.df else FeatureStore(self.df)
         self.table: OutcomeTable = build_outcome_table(self.df, cfg)
         self.segments = chronological_split(len(self.df), cfg)
         self.rng = np.random.default_rng(cfg.RANDOM_SEED)
@@ -73,7 +79,8 @@ class ResearchPipeline:
                  baseline: dict[str, Any], keep_events: bool = False):
         sig = cond.evaluate(self.store)
         det = detect_entries(sig, segment, self.cfg.MAX_HOLDING_BARS,
-                             self.cfg.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES)
+                             self.cfg.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES,
+                             self.cfg.COOLDOWN_MODE, self.table.exit_offset)
         cid = condition_id(cond)
         row: dict[str, Any] = {"condition_id": cid, "condition": cond.describe(),
                                "segment": segment.name, "stage": stage,
@@ -216,7 +223,9 @@ def _json_default(o):
 def save_results(res: SearchResult, output_dir: str | None = None) -> Path:
     base = Path(output_dir or res.cfg.OUTPUT_DIR)
     stamp = pd.Timestamp.utcnow().strftime("%Y%m%d_%H%M%S")
-    out = base / f"run_{res.cfg.ASSET}_{res.cfg.TIMEFRAME}_seed{res.cfg.RANDOM_SEED}_{stamp}"
+    c = res.cfg
+    out = base / (f"run_{c.ASSET}_{c.TIMEFRAME}_seed{c.RANDOM_SEED}"
+                  f"_tp{c.TP_PERCENT:g}_sl{c.SL_PERCENT:g}_h{c.MAX_HOLDING_BARS}_{stamp}")
     out.mkdir(parents=True, exist_ok=True)
 
     (out / "config.json").write_text(json.dumps(res.cfg.to_dict(), indent=2, default=_json_default))

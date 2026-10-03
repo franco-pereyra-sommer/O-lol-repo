@@ -11,10 +11,15 @@ Reglas:
      (TRAIN, VALIDATION o TEST). Una entrada cuyo horizonte "se sale" del
      segmento se descarta (purga): si no, el resultado de una entrada de TRAIN
      dependería de precios de VALIDATION. Se reporta cuántas se descartan.
-  2. Cooldown por condición: una señal en t se acepta sólo si
-     t - t_ultima_aceptada >= MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES.
-     Se aplica de manera independiente a cada condición; señales de
-     condiciones distintas nunca se filtran entre sí.
+  2. Re-entrada por condición (independiente para cada condición; señales
+     de condiciones distintas nunca se filtran entre sí):
+     - modo "fixed": una señal en t se acepta sólo si
+       t - t_ultima_aceptada >= MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES.
+     - modo "until_exit": una señal en t se acepta sólo si la operación
+       anterior ya cerró: t >= x, donde x es la vela en la que salió
+       (toque de TP/SL o fin del horizonte). La nueva entrada es Open[t+1],
+       posterior al cierre. Saber si la operación anterior cerró en una vela
+       <= t no es look-ahead: es información disponible en t.
 
 Nada de este módulo mira datos posteriores a t para decidir si hubo señal:
 la señal ya viene calculada (causalmente) por conditions.py. La única
@@ -66,14 +71,36 @@ def apply_cooldown(candidates: np.ndarray, cooldown: int) -> np.ndarray:
     return np.asarray(accepted, dtype=np.int64)
 
 
+def apply_until_exit(candidates: np.ndarray, exit_offset: np.ndarray) -> np.ndarray:
+    """
+    Acepta una señal y salta todas las siguientes hasta que la operación cierre.
+    exit_offset[e] = k  =>  la operación que entra en e sale en la vela e+k.
+    """
+    accepted = []
+    i, n = 0, len(candidates)
+    while i < n:
+        t = int(candidates[i])
+        accepted.append(t)
+        e = t + 1
+        exit_bar = e + int(exit_offset[e])
+        i = int(np.searchsorted(candidates, exit_bar, side="left"))
+    return np.asarray(accepted, dtype=np.int64)
+
+
 def detect_entries(signal: np.ndarray, segment: Segment, holding_bars: int,
-                   cooldown: int) -> EntryDetection:
+                   cooldown: int, mode: str = "fixed",
+                   exit_offset: np.ndarray | None = None) -> EntryDetection:
     seg_sig = signal[segment.start:segment.end]
     raw = np.flatnonzero(seg_sig) + segment.start
     # Última confirmación válida: e + H - 1 <= end - 1  =>  t <= end - 1 - H
     last_ok = segment.end - 1 - holding_bars
     ok = raw[raw <= last_ok]
-    kept = apply_cooldown(ok, cooldown)
+    if mode == "until_exit":
+        if exit_offset is None:
+            raise ValueError("El modo 'until_exit' requiere exit_offset.")
+        kept = apply_until_exit(ok, exit_offset)
+    else:
+        kept = apply_cooldown(ok, cooldown)
     return EntryDetection(
         confirm_idx=kept,
         entry_idx=kept + 1,

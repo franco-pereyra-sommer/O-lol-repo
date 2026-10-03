@@ -173,3 +173,33 @@ def test_reproducible_generation():
         return [c.key for c in s + g.generate_complex(s, 50, 3)]
     assert keys(11) == keys(11)
     assert keys(11) != keys(12)
+
+
+def test_until_exit_no_overlap():
+    from trading_research.entry_detector import apply_until_exit
+    off = np.zeros(100, dtype=int); off[6] = 3; off[10] = 29
+    # entra en 6 (t=5), sale en la vela 9 -> la siguiente señal válida es t>=9
+    assert list(apply_until_exit(np.array([5, 6, 9, 20, 45]), off)) == [5, 9, 45]
+    # con datos reales: cada entrada ocurre después de la salida anterior
+    df = random_walk(3000)
+    cfg = ResearchConfig(MAX_HOLDING_BARS=30, COOLDOWN_MODE="until_exit")
+    t = build_outcome_table(df, cfg)
+    sig = np.ones(len(df), bool)
+    det = detect_entries(sig, Segment("S", 0, len(df)), 30, 0, "until_exit", t.exit_offset)
+    e = det.entry_idx
+    exits = e + t.exit_offset[e]
+    assert np.all(e[1:] > exits[:-1])
+    assert np.all(e[1:] == exits[:-1] + 1)   # señal siempre activa -> re-entra justo después
+
+
+def test_lift_filter():
+    from trading_research.validation import passes_filters
+    st = {"n_entries": 500, "P_TP_FIRST": 0.10, "mean_net_return": -0.002,
+          "lift_P_TP_FIRST": 0.05, "lift_mean_net_return": 0.001}
+    seg = 10000
+    assert not passes_filters(st, ResearchConfig(FILTER_MODE="absolute"), seg)[0]
+    assert passes_filters(st, ResearchConfig(FILTER_MODE="lift"), seg)[0]
+    assert not passes_filters(st, ResearchConfig(FILTER_MODE="both"), seg)[0]
+    st2 = dict(st, lift_mean_net_return=-0.001)
+    ok, why = passes_filters(st2, ResearchConfig(FILTER_MODE="lift"), seg)
+    assert not ok and any("lift_mean_net" in w for w in why)

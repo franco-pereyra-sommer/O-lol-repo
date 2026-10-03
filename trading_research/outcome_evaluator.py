@@ -33,6 +33,7 @@ Costos (por operación completa):
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -40,6 +41,8 @@ import pandas as pd
 from numpy.lib.stride_tricks import sliding_window_view
 
 from .config import PositionSide, ResearchConfig
+
+log = logging.getLogger(__name__)
 
 TP_FIRST, SL_FIRST, NONE, AMBIGUOUS = 0, 1, 2, 3
 OUTCOME_NAMES = np.array(["TP_FIRST", "SL_FIRST", "NONE", "AMBIGUOUS"])
@@ -167,6 +170,9 @@ def build_outcome_table(df: pd.DataFrame, cfg: ResearchConfig) -> OutcomeTable:
     # Resultados favorables generales (sección 20)
     for spec in cfg.FAVORABLE_OUTCOMES:
         name = favorable_name(spec)
+        if spec.get("bars", 0) > H:
+            log.warning("Se omite el resultado favorable %s: bars > MAX_HOLDING_BARS (%d).", name, H)
+            continue
         t = spec["type"]
         arr = np.zeros(n, bool)
         if t == "reach":

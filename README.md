@@ -17,6 +17,29 @@ python -m pytest -q                                      # tests
 
 Todos los parámetros están en `trading_research/config.py` (`ResearchConfig`).
 
+## Opciones de línea de comandos
+
+`python run_research.py --help` lista todas. Las más usadas:
+
+| Opción | Qué hace |
+|---|---|
+| `--tp 0.05 0.08` | Take profit (fracción). Varios valores → grilla |
+| `--sl 0.02 0.03` | Stop loss (fracción). Varios valores → grilla |
+| `--horizon 30 100` | Horizonte máximo en velas. Varios valores → grilla |
+| `--cooldown-mode fixed\|until_exit` | `fixed`: cooldown de `--cooldown` velas; `until_exit`: no re-entrar mientras la operación anterior siga abierta |
+| `--filter-mode absolute\|lift\|both` | Umbrales fijos, mejora sobre la línea base del segmento, o ambos |
+| `--min-lift-p-tp 0.03` / `--min-lift-return 0` | Umbrales del modo lift |
+| `--pool-size 150` | Piezas simples usadas para construir las condiciones complejas |
+| `--commission --slippage --spread` | Costos por lado |
+
+Con más de una combinación de TP/SL/horizonte se crea `results/grid_<fecha>/`
+con una carpeta por combinación y `grid_summary.csv` comparándolas. Datos e
+indicadores se calculan una sola vez. Ojo: cada combinación extra multiplica la
+cantidad de hipótesis probadas.
+
+En modo `lift` una condición puede pasar con retorno absoluto negativo (mejora
+sobre "entrar siempre", pero no gana plata). `both` exige las dos cosas.
+
 ## Flujo
 
 ```
@@ -91,7 +114,8 @@ Etapa 1 (simples, TRAIN) → pool → Etapa 2 (complejas, TRAIN) → filtros
 10. **Cooldown y solapamiento.** Con cooldown (10) menor que el horizonte (30),
     las operaciones de una misma condición se solapan, así que sus resultados
     no son independientes y el `t` reportado sobreestima la evidencia. Para
-    operaciones sin solapamiento, poner cooldown >= MAX_HOLDING_BARS.
+    operaciones sin solapamiento usar `--cooldown-mode until_exit`. La línea
+    base siempre entra en todas las velas, en cualquier modo.
 11. **Selección del pool de la etapa 2.** Hace falta algún criterio, y se usa
     la mejora sobre la línea base en P(TP_FIRST), sólo con TRAIN. No es un
     ranking de estrategias.

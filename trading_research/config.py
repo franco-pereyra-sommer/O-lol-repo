@@ -68,7 +68,8 @@ class ResearchConfig:
     MAX_CONDITION_DEPTH: int = 1
     # Cuántas condiciones simples "informativas" de la etapa 1 se usan como
     # bloques para la etapa 2.
-    STAGE2_POOL_SIZE: int = 40
+    # Con pools chicos las combinaciones de la etapa 2 se repiten mucho.
+    STAGE2_POOL_SIZE: int = 150
     # Una condición simple es "informativa" si supera el filtro de cantidad de
     # casos Y mejora la línea base (todas las velas como entrada) en al menos
     # alguna de estas diferencias absolutas:
@@ -104,6 +105,15 @@ class ResearchConfig:
     # se acepta sólo si la última entrada aceptada de esa condición fue en una
     # vela <= t - MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES.
     MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES: int = 10
+    # Regla de re-entrada para la MISMA condición:
+    #   "fixed"      -> cooldown fijo de MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES
+    #                   velas (las operaciones pueden superponerse si el
+    #                   cooldown es menor que el horizonte).
+    #   "until_exit" -> no se vuelve a entrar mientras la operación anterior de
+    #                   esa condición siga abierta (hasta que toque TP, SL o se
+    #                   agote el horizonte). Operaciones nunca superpuestas.
+    #                   En este modo el cooldown fijo se ignora.
+    COOLDOWN_MODE: str = "fixed"
 
     # ------------------------------------------------------------------ #
     # Evaluación posterior a la entrada
@@ -134,6 +144,7 @@ class ResearchConfig:
         {"type": "reach", "p": 0.05, "bars": 30},
         {"type": "at_horizon", "p": 0.0, "bars": 10},
         {"type": "at_horizon", "p": 0.02, "bars": 30},
+        # Las que tengan "bars" > MAX_HOLDING_BARS se omiten (con aviso).
         {"type": "down_then_up", "p1": 0.01, "p2": 0.03},
         {"type": "up_then_down", "p1": 0.02, "p2": 0.02},
     )
@@ -164,6 +175,20 @@ class ResearchConfig:
     EXPECTED_RETURN_BASIS: str = "net"
     MIN_EXPECTED_RETURN: float = 0.0
 
+    # Qué criterio usar (además del mínimo de casos, que siempre se exige):
+    #   "absolute" -> P(TP_FIRST) >= MIN_P_TP_FIRST y retorno medio > MIN_EXPECTED_RETURN
+    #   "lift"     -> mejora respecto de la línea base DEL MISMO SEGMENTO
+    #                 (entrar en todas las velas):
+    #                   P(TP_FIRST) - P_base  >= MIN_LIFT_P_TP_FIRST
+    #                   retorno     - ret_base > MIN_LIFT_EXPECTED_RETURN
+    #                 Responde "¿la condición agrega información?", no
+    #                 "¿gana plata?": en un período bajista puede pasar con
+    #                 retorno absoluto negativo.
+    #   "both"     -> exige los dos criterios (información Y rentabilidad).
+    FILTER_MODE: str = "absolute"
+    MIN_LIFT_P_TP_FIRST: float = 0.03
+    MIN_LIFT_EXPECTED_RETURN: float = 0.0
+
     # ------------------------------------------------------------------ #
     # Salida
     # ------------------------------------------------------------------ #
@@ -183,9 +208,14 @@ class ResearchConfig:
             raise ValueError("AMBIGUOUS_RETURN_POLICY inválida.")
         if self.EXPECTED_RETURN_BASIS not in ("net", "gross"):
             raise ValueError("EXPECTED_RETURN_BASIS debe ser 'net' o 'gross'.")
-        for fo in self.FAVORABLE_OUTCOMES:
-            if fo.get("bars", 0) > self.MAX_HOLDING_BARS:
-                raise ValueError(f"{fo}: 'bars' > MAX_HOLDING_BARS.")
+        if self.FILTER_MODE not in ("absolute", "lift", "both"):
+            raise ValueError("FILTER_MODE debe ser 'absolute', 'lift' o 'both'.")
+        if self.COOLDOWN_MODE not in ("fixed", "until_exit"):
+            raise ValueError("COOLDOWN_MODE debe ser 'fixed' o 'until_exit'.")
+        if self.MAX_HOLDING_BARS < 1:
+            raise ValueError("MAX_HOLDING_BARS debe ser >= 1.")
+        if not (self.TP_PERCENT > 0 and 0 < self.SL_PERCENT < 1):
+            raise ValueError("TP_PERCENT debe ser > 0 y SL_PERCENT entre 0 y 1.")
         if self.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES < 0:
             raise ValueError("El cooldown no puede ser negativo.")
 

@@ -109,6 +109,7 @@ def run_parameters(cfg: ResearchConfig) -> dict[str, Any]:
     return {"asset": cfg.ASSET, "timeframe": cfg.TIMEFRAME, "side": cfg.POSITION_TYPE,
             "TP": cfg.TP_PERCENT, "SL": cfg.SL_PERCENT, "holding_horizon": cfg.MAX_HOLDING_BARS,
             "cooldown": cfg.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES,
+            "cooldown_mode": cfg.COOLDOWN_MODE, "filter_mode": cfg.FILTER_MODE,
             "commission": cfg.COMMISSION_RATE, "slippage": cfg.SLIPPAGE_RATE,
             "spread": cfg.SPREAD_RATE, "ambiguous_policy": cfg.AMBIGUOUS_RETURN_POLICY,
             "random_seed": cfg.RANDOM_SEED}
