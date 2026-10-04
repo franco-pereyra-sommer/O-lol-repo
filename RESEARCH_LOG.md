@@ -15,12 +15,12 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 ## 0. Estado actual y guía de lectura
 
-*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-04, con EXP-007 en curso. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
+*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-04, tras cerrar EXP-007. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
 
 ### 0.1 En pocas palabras
 - **Qué se busca:** reglas de entrada (por ejemplo "RSI cruza tal valor y la media corta supera a la larga") que den ganancia **después de costos**, en datos que la regla **no vio** al elegirse, y de forma repetible en distintos períodos del mercado.
 - **Dónde estamos:** con BTCUSDT 1h (2017-2026) **ninguna variante probada gana dinero fuera de muestra** (EXP-001, 002, 005). No hay "candidato" y el tramo final de datos reservado (holdout) **sigue sin abrirse**.
-- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007. Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
+- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007 (todas terminadas). Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
 
 ### 0.2 Experimentos: estado y conclusión (una línea cada uno)
 | Experimento | Qué fue | Estado | Conclusión |
@@ -32,7 +32,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 | EXP-004 | Cómo corregir por probar miles de condiciones (Reality Check y PBO) | Cerrado | Se implementaron y validaron con simulaciones; se midió que "la mejor condición" se degrada fuera de muestra. |
 | EXP-005 | Reality Check sobre las 4 variantes ya corridas | Cerrado | p ≈ 0,9–1,0: ninguna es distinguible de cero ni de la línea base. |
 | EXP-006 | Segunda prueba de look-ahead (que ninguna señal use datos futuros) | Cerrado | 0 fugas en 5.000 condiciones. Un look-ahead leve en el costo del escenario `conservative` fue corregido. |
-| EXP-007 | Operaciones superpuestas: qué estadístico es válido y qué cooldown conviene | **En curso** | Parte A ya dio resultado (ver su entrada); la Parte B (procedimiento completo) está corriendo. |
+| EXP-007 | Operaciones superpuestas: qué estadístico es válido y qué cooldown conviene | Cerrado | El t entre operaciones es inútil (bajo ruido "pasa" t ≥ 3 el 24 % de las veces); valen el t entre folds y el HAC. Cooldown estándar: `until_exit`. |
 
 ### 0.3 Respuestas a las preguntas de revisión
 
@@ -51,13 +51,13 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 **3. Estado del roadmap.**
 - EXP-001/002 están **cerrados y reproducidos** (se repitieron en EXP-005 y dieron los mismos números al dígito).
-- Terminados: EXP-000 a EXP-006 (ver 0.2). En curso: EXP-007.
-- **Pendiente de la tabla original** (sección 4, Plan): revisión estadística de operaciones superpuestas (= EXP-007, en curso); features de régimen (tendencia en 4h/diario, volatilidad); condiciones "contexto + disparador"; TP/SL proporcionales al ATR; volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
+- Terminados: EXP-000 a EXP-007 (ver 0.2). En curso: ninguno.
+- **Pendiente de la tabla original** (sección 4, Plan): features de régimen (tendencia en 4h/diario, volatilidad); condiciones "contexto + disparador"; TP/SL proporcionales al ATR; volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
 - La numeración vieja (EXP-003 = régimen, EXP-004 = contexto+disparador) **ya fue reemplazada** en la sección 4.
 
 **4. Próximo experimento (propuesta, la decisión es tuya).**
-1. Cerrar EXP-007 (define cómo se medirá todo lo siguiente: qué cooldown usar y qué estadístico es el estándar).
-2. Después, volver a lo experimental. Lo más coherente con el plan es **features de régimen** (tendencia en temporalidades mayores y volatilidad relativa), porque son el requisito de "contexto + disparador". Tras agregarlas hay que correr `run_lookahead.py` (regla de EXP-006) y comparar contra las 4 variantes con el Reality Check (K sube a 5, 6…).
+1. ~~Cerrar EXP-007~~ (hecho: cooldown `until_exit`; deciden el t entre folds y el HAC, nunca el t entre operaciones).
+2. Volver a lo experimental. Lo más coherente con el plan es **features de régimen** (tendencia en temporalidades mayores y volatilidad relativa), porque son el requisito de "contexto + disparador". Tras agregarlas hay que correr `run_lookahead.py` (regla de EXP-006) y comparar contra las 4 variantes con el Reality Check (K sube a 5, 6…).
 3. Alternativa si prefieres más validez antes de más capacidad: CPCV o PBO sobre el lift.
 - *Decisiones tomadas por Claude que conviene que conozcas y puedas revertir:* (a) se enmendó el criterio de candidato a "t entre folds ≥ 3" (EXP-003); (b) se fijó en 1 % el ATR supuesto en las primeras velas del modelo de slippage (EXP-006); (c) se agregó la regla 7 (Bonferroni con la cuenta K).
 
@@ -198,6 +198,7 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
    - retorno neto OOS agrupado de todos los folds > 0 con **t entre folds ≥ 3** (enmendado en EXP-003; antes era t entre entradas, inflado por el solapamiento), usando cooldown `until_exit`;
    - lo anterior con costos `typical`, y retorno OOS agrupado > 0 también con `conservative`;
    - al menos 100 operaciones OOS en total.
+   - (agregado en EXP-007) el t HAC con 3H rezagos sobre la serie OOS por vela (`oos_hac_t_3H`) se informa siempre; si es < 2 mientras el t entre folds es ≥ 3, el candidato se considera no confirmado. El t entre entradas es sólo descriptivo.
 5. **Una sola variable por experimento** cuando sea posible, para saber qué causó el cambio.
 6. **Un resultado negativo también se registra.** Descartar ideas es parte del avance.
 7. **Cuenta K de variantes** (agregada en EXP-004): toda variante de procedimiento (lado, TP/SL/H, ventana, filtro) evaluada contra la misma historia OOS suma a K. Mientras no exista el Reality Check sobre series OOS, el umbral de t entre folds se ajusta por Bonferroni (p ajustado = K × p ≤ 0,05). K actual = 4 (EXP-001 y EXP-002, LONG y SHORT).
@@ -397,7 +398,7 @@ Lectura: la hipótesis se cumple, con una excepción encontrada antes de la corr
 Decisión: se mantiene todo; `run_lookahead.py` se vuelve parte del protocolo: **correrlo después de agregar cualquier feature, indicador o modelo de costos nuevo** (cada feature nueva ya requería un test de causalidad; este chequeo lo cubre en bloque). Holdout cerrado; sin cambios en K ni en el contador (1.531.500).
 Próximo paso: ítem 3 del plan, revisión del tratamiento estadístico de operaciones superpuestas (cooldown `fixed` vs `until_exit`; t por entradas vs por folds vs HAC), o directamente volver a la búsqueda con las features de régimen si preferís priorizar capacidad; sugiero el ítem 3 porque define cómo se evaluará todo lo siguiente.
 
-### EXP-007 — Operaciones superpuestas: qué estadístico es válido y qué cooldown conviene [EN CURSO] (2026-10-04)
+### EXP-007 — Operaciones superpuestas: qué estadístico es válido y qué cooldown conviene (2026-10-04)
 Pregunta: cooldown `fixed` vs `until_exit`, y t entre entradas vs t entre folds vs HAC vs bootstrap, ¿cuál se calibra bien (no rechaza de más cuando no hay nada) y cuál tiene potencia cuando hay algo? No es un experimento de rentabilidad: usa series sintéticas, no suma al contador de hipótesis (1.531.500) ni a K.
 Hipótesis (escritas antes de correr el estudio completo):
 - H1 (por condición, nula): con `fixed` y cooldown < H el t entre entradas está inflado (desvío > 1, P(|t|>2) ≫ 5 %); se normaliza cuando cooldown ≳ H; `until_exit` es válido o algo conservador.
@@ -405,6 +406,40 @@ Hipótesis (escritas antes de correr el estudio completo):
 - H3: el cooldown no cambia la calibración del t entre folds/HAC; `until_exit` tiene más potencia que `fixed` con cooldown = H (más operaciones).
 Diseño (`run_overlap_study.py`): Parte A: 150 caminos aleatorios, UNA condición con señales aleatorias (10 % de las velas), H = 50, cooldown ∈ {fixed 1, 5, 15, H, 2H, until_exit}. Parte B: 60 repeticiones del walk-forward COMPLETO (7.500→300 condiciones simples sorteadas, TRAIN 1.500 / VAL 500, 15 folds, TP = SL = 3 %, H = 50, sin costos, ambigüedad `midpoint`, filtro `both`) sobre 9.000 velas sintéticas, en (i) camino aleatorio sin ventaja con precio martingala (nula) y (ii) autocorrelación AR(1) φ = 0,2 en los retornos (ventaja exagerada, sólo para comparar potencia), para cooldown ∈ {until_exit, fixed 15, fixed H}. Estadísticos: t entre entradas, t entre folds, HAC con H y 3H rezagos, p del bootstrap estacionario (bloque 3H). Se reporta P(t>2), P(t>3) y P(p<0,05).
 Nota de diseño: con log-retornos de media 0 el precio tiene deriva +σ²/2 y las operaciones LONG ganan en promedio aun sin ventaja; el generador usa media −σ²/2 para que la nula tenga retorno esperado 0.
+Resultados.
+**Parte A (una condición aleatoria sin ventaja, H = 50, 150 caminos):**
+
+| Cooldown | Entradas (media) | Desvío del t (ideal 1) | P(\|t\|>2) (ideal 4,6 %) |
+|---|---|---|---|
+| fixed 1 | 492 | 1,89 | 30,7 % |
+| fixed 5 | 352 | 1,56 | 19,3 % |
+| fixed 15 (valor por defecto de `MIN_BARS_BETWEEN…`) | 205 | 1,21 | 10,7 % |
+| fixed H (50) | 84 | 1,01 | 4,7 % |
+| fixed 2H (100) | 46 | 0,99 | 4,0 % |
+| until_exit | 148 | 0,96 | 4,0 % |
+
+**Parte B (procedimiento completo, 60 repeticiones por celda, 15 folds, sin costos, escenario nulo con precio martingala; ideal con t normal: P(t>2) = 2,3 %, P(t>3) = 0,13 %, p-bootstrap < 0,05 el 5 %):**
+
+| Estadístico (cooldown until_exit) | Desvío | P(t>2) | P(t>3) |
+|---|---|---|---|
+| t entre entradas OOS agrupadas | 6,0 | 26,7 % | **23,3 %** |
+| t entre folds | 0,93 | 1,7 % | 0 % |
+| t HAC (H rezagos) | 1,07 | 3,3 % | 0 % |
+| t HAC (3H rezagos) | 1,03 | 1,7 % | 0 % |
+| p bootstrap estacionario (bloque 3H) | — | — | P(p<0,05) = 5 % |
+Con `fixed` 15 los números son prácticamente idénticos (t entre entradas: P(t>3) = 25 %; t entre folds 0 %; HAC 3,3 %; bootstrap 5 %). Con `fixed` H el procedimiento no seleccionó ninguna condición (TRAIN de 1.500 velas / cooldown 50 deja ≤ 30 entradas posibles y el mínimo exigido es 30): esa celda no se pudo medir en el procedimiento; sólo vale la Parte A.
+Escenario con "ventaja" (AR(1) φ = 0,2, exagerada a propósito): el procedimiento casi no la aprovecha. `until_exit`: retorno medio por vela +0,012 % (nula: −0,008 %), P(t entre folds > 2) = 11,7 %, HAC 3,3 %, bootstrap 6,7 %. `fixed` 15: +0,003 %, t entre folds 6,7 %, HAC 3,3 %, bootstrap 8,3 %. Potencia baja para todos los estadísticos en este escenario; no permite ordenarlos por potencia, sólo muestra que `until_exit` captura más de la ventaja que `fixed` 15 (+0,012 % vs +0,003 %) y que ningún estadístico "se inventa" una ventaja que el procedimiento no encontró.
+
+Lectura:
+- H1 se cumple: con cooldown fijo menor que el horizonte, el t de UNA condición está inflado; con `fixed` ≥ H o `until_exit` es correcto. `until_exit` tiene el mismo tamaño de error que `fixed` H pero conserva 76 % más entradas (148 vs 84): es el único modo que evita solapamiento sin tirar muestra.
+- H2 se cumple y es contundente: el t entre todas las entradas OOS agrupadas rechaza la nula con t > 3 el ~24 % de las veces (debería ser 0,13 %). Es decir, bajo ruido puro un procedimiento "pasaba" el criterio viejo de t ≥ 3 una de cada cuatro veces. EXP-003 ya lo había corregido; esto lo mide. El t entre folds y el HAC están bien calibrados (algo conservadores); el bootstrap acierta el 5 % nominal.
+- H3 sólo se confirma en la parte de que el cooldown no cambia la calibración de los estadísticos válidos; la comparación de potencia entre estadísticos quedó sin resolver (el escenario de ventaja es demasiado débil).
+Decisión (estándar de medición desde acá):
+1. **Cooldown:** `until_exit` es el estándar. Se agregó una advertencia en `ResearchConfig.validate` si se usa `fixed` con cooldown < horizonte.
+2. **Estadísticos:** el t entre entradas queda **sólo descriptivo; nunca decide**. Decide el t entre folds (regla 4). Se agrega el t HAC con 3H rezagos sobre la serie OOS por vela (`oos_hac_t_3H` en el resumen y en la salida de `run_research.py`), que se informa siempre; si discrepa mucho del t entre folds (HAC < 2 con t entre folds ≥ 3) el candidato se considera **no confirmado**. Para comparar varias variantes: Reality Check (EXP-005).
+3. Con pocos folds el t entre folds tiene pocos grados de libertad (K = 15 aquí fue conservador); preferir ≥ 10 folds.
+Cambios de código: `newey_west_t` y `procedure_series` en `multiple_testing.py`, `oos_hac_t_3H` en `walk_forward.py`, advertencia en `config.py`, `run_overlap_study.py`; tests `test_newey_west_t_matches_iid_t_without_lags_and_corrects_dependent_series`, `test_procedure_series_zero_when_no_trades_and_lift_subtracts_baseline`, `test_fixed_cooldown_shorter_than_horizon_warns` (47 pasan). No suma al contador de hipótesis (1.531.500) ni a K (4).
+Próximo paso: con la medición estandarizada, volver a la parte experimental. Propuesta: features de régimen (tendencia en 4h/diario y volatilidad relativa), seguidas de `run_lookahead.py` y comparación con las 4 variantes por Reality Check.
 
 ---
 
@@ -415,7 +450,7 @@ Orden revisado a pedido del usuario (2026-10-04): primero validez estadística d
 Siguiente (alta prioridad, completa la línea de validez):
 1. ~~`procedure_oos_series` + Reality Check sobre las 4 variantes~~ (hecho en EXP-005; SPA queda como extensión).
 2. ~~Segunda prueba de look-ahead a nivel de señales~~ (hecho en EXP-006; se corre con `run_lookahead.py` tras cada feature/costo nuevo).
-3. **Revisión del tratamiento estadístico de operaciones superpuestas** (cooldown `fixed` vs `until_exit`; t por entradas vs por folds vs HAC).
+3. ~~Revisión del tratamiento estadístico de operaciones superpuestas~~ (hecho en EXP-007).
 
 Hoja de ruta original, conservada:
 4. Features de régimen: tendencia en temporalidades mayores (4h, diario) y volatilidad relativa (era EXP-003).
