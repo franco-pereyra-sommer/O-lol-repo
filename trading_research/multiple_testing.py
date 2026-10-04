@@ -60,6 +60,32 @@ def condition_block_stats(signal: np.ndarray, net_return: np.ndarray, exit_offse
     return s, c
 
 
+def procedure_series(z: dict[str, np.ndarray], scenario: str, benchmark: str = "zero") -> np.ndarray:
+    """Serie por vela de un walk-forward a partir de su `oos_series.npz`: promedio simple de los
+    retornos netos de las operaciones abiertas en la vela (0 si no hay). benchmark "lift": se resta la
+    media de la línea base del fold en las velas con operación."""
+    cnt = z["cnt"]
+    with np.errstate(invalid="ignore", divide="ignore"):
+        r = np.where(cnt > 0, z[f"sum_{scenario}"] / cnt, 0.0)
+    if benchmark == "lift":
+        r = np.where(cnt > 0, r - np.nan_to_num(z[f"base_{scenario}"]), 0.0)
+    return r
+
+
+def newey_west_t(x: np.ndarray, lags: int) -> float:
+    """t de la media de una serie con error estándar HAC (Newey-West, pesos de Bartlett).
+    `lags` debe cubrir la dependencia: para series de operaciones de hasta H velas, >= H."""
+    x = np.asarray(x, dtype=float)
+    T = len(x)
+    if T < 3:
+        return float("nan")
+    u = x - x.mean()
+    omega = float(u @ u) / T
+    for j in range(1, min(lags, T - 1) + 1):
+        omega += 2.0 * (1.0 - j / (lags + 1.0)) * float(u[j:] @ u[:-j]) / T
+    return float(x.mean() / np.sqrt(omega / T)) if omega > 0 else float("nan")
+
+
 # ---------------------------------------------------------------------- #
 # White Reality Check (bootstrap estacionario, estadístico estudentizado)
 # ---------------------------------------------------------------------- #

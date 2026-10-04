@@ -20,7 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
-from trading_research.multiple_testing import reality_check
+from trading_research.multiple_testing import procedure_series, reality_check
 
 
 def load_variant(path: str | Path) -> dict[str, np.ndarray]:
@@ -28,13 +28,7 @@ def load_variant(path: str | Path) -> dict[str, np.ndarray]:
     return {k: z[k] for k in z.files}
 
 
-def variant_series(z: dict[str, np.ndarray], scenario: str, benchmark: str) -> np.ndarray:
-    cnt = z["cnt"]
-    with np.errstate(invalid="ignore", divide="ignore"):
-        r = np.where(cnt > 0, z[f"sum_{scenario}"] / cnt, 0.0)
-    if benchmark == "lift":
-        r = np.where(cnt > 0, r - np.nan_to_num(z[f"base_{scenario}"]), 0.0)
-    return r
+variant_series = procedure_series
 
 
 def main() -> None:

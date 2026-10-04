@@ -4,7 +4,8 @@ import pytest
 
 from trading_research.entry_detector import Segment, fits_in_segment
 from trading_research.multiple_testing import (condition_block_stats, cscv_pbo, entry_series,
-                                               reality_check, stationary_bootstrap_weights)
+                                               newey_west_t, procedure_series, reality_check,
+                                               stationary_bootstrap_weights)
 
 
 def _ma_noise(rng, T, K, w):
@@ -93,3 +94,23 @@ def test_entry_series_and_block_stats_respect_purge():
         e = np.arange(b.start + 1, b.end)
         assert cn[j] == fits_in_segment(e, H, b).sum()   # sólo entradas cuyo intervalo cabe en el bloque
         assert sm[j] == pytest.approx(net[e[fits_in_segment(e, H, b)]].sum())
+
+
+def test_newey_west_t_matches_iid_t_without_lags_and_corrects_dependent_series():
+    rng = np.random.default_rng(6)
+    x = rng.normal(0.1, 1.0, 4000)
+    assert newey_west_t(x, 0) == pytest.approx(x.mean() / (x.std(ddof=0) / np.sqrt(len(x))), rel=1e-9)
+    # series MA(20) bajo H0: el t naive rechaza mucho más que 5 %, el HAC con lags >= 20 no
+    naive, hac = [], []
+    for _ in range(60):
+        y = _ma_noise(rng, 2000, 1, 20)[:, 0]
+        naive.append(abs(newey_west_t(y, 0)) > 1.96)
+        hac.append(abs(newey_west_t(y, 40)) > 1.96)
+    assert np.mean(naive) > 0.4 and np.mean(hac) < 0.15
+
+
+def test_procedure_series_zero_when_no_trades_and_lift_subtracts_baseline():
+    z = {"cnt": np.array([0.0, 2.0, 1.0]), "sum_typical": np.array([0.0, 0.04, -0.01]),
+         "base_typical": np.array([0.001, 0.001, 0.001])}
+    assert np.allclose(procedure_series(z, "typical"), [0.0, 0.02, -0.01])
+    assert np.allclose(procedure_series(z, "typical", "lift"), [0.0, 0.019, -0.011])

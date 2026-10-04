@@ -331,6 +331,15 @@ Lectura: la hipótesis se cumple, con una excepción encontrada antes de la corr
 Decisión: se mantiene todo; `run_lookahead.py` se vuelve parte del protocolo: **correrlo después de agregar cualquier feature, indicador o modelo de costos nuevo** (cada feature nueva ya requería un test de causalidad; este chequeo lo cubre en bloque). Holdout cerrado; sin cambios en K ni en el contador (1.531.500).
 Próximo paso: ítem 3 del plan, revisión del tratamiento estadístico de operaciones superpuestas (cooldown `fixed` vs `until_exit`; t por entradas vs por folds vs HAC), o directamente volver a la búsqueda con las features de régimen si preferís priorizar capacidad; sugiero el ítem 3 porque define cómo se evaluará todo lo siguiente.
 
+### EXP-007 — Operaciones superpuestas: qué estadístico es válido y qué cooldown conviene [EN CURSO] (2026-10-04)
+Pregunta: cooldown `fixed` vs `until_exit`, y t entre entradas vs t entre folds vs HAC vs bootstrap, ¿cuál se calibra bien (no rechaza de más cuando no hay nada) y cuál tiene potencia cuando hay algo? No es un experimento de rentabilidad: usa series sintéticas, no suma al contador de hipótesis (1.531.500) ni a K.
+Hipótesis (escritas antes de correr el estudio completo):
+- H1 (por condición, nula): con `fixed` y cooldown < H el t entre entradas está inflado (desvío > 1, P(|t|>2) ≫ 5 %); se normaliza cuando cooldown ≳ H; `until_exit` es válido o algo conservador.
+- H2 (por procedimiento, nula): el t entre todas las entradas OOS agrupadas (el de antes de EXP-003) está muy inflado en cualquier cooldown (P(t>3) ≫ 0,13 %); el t entre folds y el HAC sobre la serie por vela (rezagos ≥ H) quedan cerca de lo nominal (P(t>3) ≲ 1 %); el HAC puede ser algo liberal con T chico.
+- H3: el cooldown no cambia la calibración del t entre folds/HAC; `until_exit` tiene más potencia que `fixed` con cooldown = H (más operaciones).
+Diseño (`run_overlap_study.py`): Parte A: 150 caminos aleatorios, UNA condición con señales aleatorias (10 % de las velas), H = 50, cooldown ∈ {fixed 1, 5, 15, H, 2H, until_exit}. Parte B: 60 repeticiones del walk-forward COMPLETO (7.500→300 condiciones simples sorteadas, TRAIN 1.500 / VAL 500, 15 folds, TP = SL = 3 %, H = 50, sin costos, ambigüedad `midpoint`, filtro `both`) sobre 9.000 velas sintéticas, en (i) camino aleatorio sin ventaja con precio martingala (nula) y (ii) autocorrelación AR(1) φ = 0,2 en los retornos (ventaja exagerada, sólo para comparar potencia), para cooldown ∈ {until_exit, fixed 15, fixed H}. Estadísticos: t entre entradas, t entre folds, HAC con H y 3H rezagos, p del bootstrap estacionario (bloque 3H). Se reporta P(t>2), P(t>3) y P(p<0,05).
+Nota de diseño: con log-retornos de media 0 el precio tiene deriva +σ²/2 y las operaciones LONG ganan en promedio aun sin ventaja; el generador usa media −σ²/2 para que la nula tenga retorno esperado 0.
+
 ---
 
 ## 4. Plan
