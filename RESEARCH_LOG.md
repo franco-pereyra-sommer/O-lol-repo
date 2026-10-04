@@ -233,6 +233,9 @@ Nota de robustez: si el filtro de horizonte se rompiera, `apply_until_exit` entr
 **7. Efecto en experimentos futuros.** Todos se evalúan con el t entre folds; el t por entradas queda sólo como descriptivo. Preferir `until_exit`. Con pocos folds el t entre folds tiene pocos grados de libertad: más folds cortos (como EXP-002) es más informativo que pocos folds largos. Si se implementa CPCV hará falta purga + embargo con `trade_intervals`.
 Decisión: sin cambios en búsqueda ni costos. Holdout cerrado. Próximo paso: EXP-004. El contador de "experimentos sin avance" no se incrementa (no fue un experimento de búsqueda).
 
+### EXP-004 — White Reality Check + PBO (2026-10-04) [EN CURSO]
+Hipótesis (escrita antes de la corrida definitiva de `run_pbo.py`): en el espacio de búsqueda actual (7.500 condiciones simples, TP 5 %/SL 3 %/100 velas, `until_exit`, costos `typical`, 16 bloques del período de desarrollo, holdout fuera) la PBO es ≥ 0,5 y el retorno neto medio de la mejor condición IN-sample es negativo o ~0 OUT-of-sample, porque no hay información en las condiciones y el costo (~0,25 %) empuja todo hacia abajo. Un piloto con 1.500 condiciones LONG (ya corrido, cuenta como 1.500 hipótesis) dio PBO 0,62, mejor IN +0,68 % → OUT −0,27 %. Corrida definitiva: LONG y SHORT × 7.500 = 15.000 hipótesis (acumulado: 1.516.500).
+
 ---
 
 ## 4. Plan
