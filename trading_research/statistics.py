@@ -82,6 +82,10 @@ def compute_stats(entry_idx: np.ndarray, table: OutcomeTable, cfg: ResearchConfi
     s["se_mean_net_return"] = s["std_net_return"] / math.sqrt(n) if n > 1 else nan
     s["t_mean_net_return"] = (s["mean_net_return"] / s["se_mean_net_return"]
                               if n > 1 and s["se_mean_net_return"] > 0 else nan)
+    for sc, arr in table.net_by_scenario.items():
+        x = arr[entry_idx]
+        s[f"mean_net_return_{sc}"] = float(x.mean()) if n else nan
+        s[f"median_net_return_{sc}"] = float(np.median(x)) if n else nan
     non_amb = oc != AMBIGUOUS
     s["mean_net_return_excl_ambiguous"] = float(r[non_amb].mean()) if non_amb.any() else nan
     s["win_rate_net"] = float((r > 0).mean()) if n else nan
@@ -110,6 +114,7 @@ def run_parameters(cfg: ResearchConfig) -> dict[str, Any]:
             "TP": cfg.TP_PERCENT, "SL": cfg.SL_PERCENT, "holding_horizon": cfg.MAX_HOLDING_BARS,
             "cooldown": cfg.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES,
             "cooldown_mode": cfg.COOLDOWN_MODE, "filter_mode": cfg.FILTER_MODE,
+            "cost_scenario": cfg.COST_SCENARIO, "tp_order_type": cfg.TP_ORDER_TYPE,
             "commission": cfg.COMMISSION_RATE, "slippage": cfg.SLIPPAGE_RATE,
             "spread": cfg.SPREAD_RATE, "ambiguous_policy": cfg.AMBIGUOUS_RETURN_POLICY,
             "random_seed": cfg.RANDOM_SEED}
@@ -125,7 +130,10 @@ def baseline_stats(segment: Segment, table: OutcomeTable, cfg: ResearchConfig) -
 
 
 def add_lift(stats: dict[str, Any], base: dict[str, Any]) -> None:
-    for k in ("P_TP_FIRST", "mean_gross_return", "mean_net_return", "mean_MFE", "mean_MAE"):
+    keys = ["P_TP_FIRST", "mean_gross_return", "mean_net_return", "mean_MFE", "mean_MAE"]
+    keys += [k for k in stats if k.startswith("mean_net_return_") and k in base
+             and k != "mean_net_return_excl_ambiguous"]
+    for k in keys:
         stats[f"lift_{k}"] = stats.get(k, math.nan) - base.get(k, math.nan)
 
 
@@ -146,6 +154,7 @@ def events_frame(df: pd.DataFrame, det: EntryDetection, table: OutcomeTable,
         "MAE": table.mae[e],
         "return": table.gross_return[e],
         "net_return": table.net_return[e],
+        **{f"net_return_{sc}": arr[e] for sc, arr in table.net_by_scenario.items()},
     })
 
 
@@ -162,4 +171,8 @@ def format_report(s: dict[str, Any]) -> str:
         f"Mean gross return: {_pct(s['mean_gross_return'])}",
         f"Mean net return:   {_pct(s['mean_net_return'])}   (t = {_pct(s['t_mean_net_return'])})",
     ]
+    scs = [k for k in s if k.startswith("mean_net_return_") and k != "mean_net_return_excl_ambiguous"]
+    if scs:
+        lines.append("Mean net por escenario de costos: " + "  ".join(
+            f"{k[len('mean_net_return_'):]}={_pct(s[k])}" for k in scs))
     return "\n".join(lines)

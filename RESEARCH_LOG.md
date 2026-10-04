@@ -38,7 +38,8 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
 | Columna | Cálculo |
 |---|---|
 | `gross_return` (bruto) | LONG: `X/P − 1`. SHORT: `1 − X/P`. |
-| `net_return` (neto) | El bruto descontando comisión (en cada lado), slippage (en cada lado) y medio spread al entrar y medio al salir. Con los valores actuales, unos 0,32 % por operación completa. |
+| `net_return` (neto) | El bruto descontando costos según el escenario principal (`COST_SCENARIO`, por defecto `typical`). Entrada de mercado: comisión taker + medio spread + slippage. Salida por TP con orden límite: comisión maker, sin spread ni slippage. Salida por SL o por tiempo: taker + medio spread + slippage. En `typical` son unos 0,22–0,26 % por operación completa (casi todo es la comisión de Binance, 0,10 % por lado). |
+| `mean_net_return_optimistic / _typical / _conservative` | El mismo retorno neto medio bajo cada escenario de costos. Si algo sólo es positivo en `optimistic`, no es robusto. Spread y slippage de los escenarios son **estimaciones**, no datos observados. |
 | `mean_gross_return`, `mean_net_return` | `(1/N) Σ R_i`. Es el **retorno esperado** por operación (`expected_return` y `net_expected_return` son el mismo valor con otro nombre). |
 | `median_*_return` | Retorno de la operación del medio al ordenarlas. Si es muy distinto de la media, unas pocas operaciones extremas mueven el promedio. |
 | `std_net_return` | Desvío estándar de los `R_i` netos. |
@@ -106,6 +107,7 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
 | `base_val_mean_net` | Línea base del VALIDATION. |
 | `oos_pooled_mean_net` | Retorno neto medio de **todas** las operaciones OOS de las seleccionadas juntas: `Σ(N_c × media_c) / Σ N_c`. Es lo que habría ganado alguien que operara todo lo que el TRAIN eligió. |
 | `oos_pooled_lift_net` | `oos_pooled_mean_net − base_val_mean_net`. |
+| `oos_pooled_mean_net_<escenario>` | El mismo retorno OOS agrupado bajo cada escenario de costos. |
 | `oos_frac_cond_net_gt0` | Fracción de condiciones seleccionadas con media neta > 0 en OOS. |
 | `oos_frac_cond_beat_base` | Fracción que supera a la línea base en OOS. |
 | `folds_oos_net_gt0` | En cuántos folds `oos_pooled_mean_net` > 0. |
@@ -128,6 +130,7 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
    - retorno neto OOS agrupado > 0 en al menos 4 de 5 folds;
    - supera a la línea base en al menos 4 de 5 folds;
    - retorno neto OOS agrupado de todos los folds > 0 con t ≥ 3, usando cooldown `until_exit`;
+   - lo anterior con costos `typical`, y retorno OOS agrupado > 0 también con `conservative`;
    - al menos 100 operaciones OOS en total.
 5. **Una sola variable por experimento** cuando sea posible, para saber qué causó el cambio.
 6. **Un resultado negativo también se registra.** Descartar ideas es parte del avance.
@@ -135,6 +138,8 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
 ---
 
 ## 3. Bitácora
+
+Las entradas nuevas se agregan al final de esta sección (antes de "## 4. Plan"), y se actualiza el plan si cambia.
 
 Formato de cada entrada:
 
@@ -153,10 +158,66 @@ Próximo paso: qué se prueba después y por qué.
 ### EXP-000 — Estado de partida (2026-10-04)
 Hipótesis: con indicadores técnicos simples sobre BTC 1h existe alguna condición rentable después de costos.
 Datos: Yahoo, BTC-USD 1h, 2024-01 → 2026-10 (24.138 velas).
+Costos: modelo anterior (hoy escenario `custom`: 0,1 % por lado + slippage 0,05 % + spread 0,02 %, ≈ 0,32 % por operación).
 Resultado:
 - Split único TRAIN/VAL/TEST: miles de condiciones probadas en varias grillas; ninguna sobrevive de forma creíble. La única que pasó un TEST tuvo t ≈ 0,19 (indistinguible de 0) y fue 1 de 288 evaluadas.
 - Walk-forward 4 folds (TP 5 %, SL 3 %, 100 velas, `until_exit`, filtro `both`): LONG con OOS > 0 en 1/4 folds; SHORT en 0/4.
 - Con una serie aleatoria de 80.000 velas, el procedimiento no "encuentra" nada (control correcto).
 Lectura: dos años de datos alcanzan para un solo régimen por segmento; no se puede distinguir una señal de un efecto del régimen del mercado.
 Decisión: pasar a historia larga de Binance (desde 2017) y evaluar todo en walk-forward.
-Próximo paso: EXP-001 — descargar BTCUSDT 1h de Binance y repetir la línea base y el walk-forward LONG/SHORT con la configuración actual, como punto de referencia.
+Próximo paso: EXP-001 (ver "Plan").
+
+Nota (2026-10-04): se reemplazó el modelo de costos por `costs.py` con escenarios. Con los mismos datos y walk-forward de 4 folds (LONG, TP 5 %/SL 3 %/100 velas), el retorno OOS agrupado fue −0,37 % (`typical`), −0,29 % (`optimistic`) y −0,48 % (`conservative`), con 2/4 folds positivos en `typical`. Los resultados de EXP-000 con el modelo viejo no son directamente comparables con los nuevos.
+
+---
+
+## 4. Plan
+
+Orden previsto (se puede cambiar según resultados, registrando el motivo):
+
+1. **EXP-001** — Descargar BTCUSDT 1h de Binance (desde 2017). Línea base y walk-forward LONG y SHORT con la configuración actual y costos `typical`. Es la referencia contra la que se compara todo lo demás.
+2. **EXP-002** — Walk-forward de ventanas cortas (idea A). Se implementa antes de seguir agregando features, para que todos los experimentos posteriores se evalúen igual.
+3. **EXP-003** — Features de régimen: tendencia en temporalidades mayores (4h, diario) y volatilidad relativa. Son requisito para la idea B.
+4. **EXP-004** — Condiciones con lógica (idea B): plantillas "contexto + disparador" en lugar de combinaciones totalmente aleatorias.
+5. **EXP-005** — TP/SL proporcionales al ATR.
+6. **EXP-006** — Volumen y hora del día / día de la semana.
+
+## 5. Ideas pendientes
+
+### A. Patrones de corto plazo con ventanas cortas (propuesta del usuario)
+Idea: en lugar de exigir que una condición funcione durante 10 años, buscar
+condiciones que funcionen en el corto plazo y re-buscarlas seguido. Ventana
+propuesta: 3–4 meses TRAIN → 1 mes VALIDATION → 1 mes TEST → 2 semanas de
+"situación real" (si no hay ningún caso, estirar una semana más).
+
+Evaluación:
+- Tiene sentido: los mercados cambian y una regla que se re-optimiza seguido
+  puede funcionar aunque ninguna regla fija funcione siempre.
+- Lo que se evalúa ya no es cada condición sino el **procedimiento** "buscar en
+  los últimos meses y operar las 2 semanas siguientes". Con 9 años de datos
+  son unas 200 ventanas de 2 semanas: cada ventana tiene pocos casos, pero el
+  total de todas las "situaciones reales" juntas sí alcanza para medir.
+- "Situación real" equivale a operar en vivo: las condiciones se eligieron
+  sin ver ese período. Es la métrica principal.
+- Estirar una semana si no hubo casos es válido porque depende sólo de que no
+  aparecieron señales, algo que se sabe en tiempo real. La siguiente ventana
+  arranca después de que termina la extendida.
+- Riesgos: 3–4 meses de 1h son ~2.500 velas, y con el mínimo de casos actual
+  quedarían pocas condiciones; puede hacer falta bajar el mínimo absoluto en
+  TRAIN. Con ventanas cortas los costos pesan más.
+
+### B. Condiciones con lógica en lugar de totalmente aleatorias (propuesta del usuario)
+Idea: estructurar las condiciones, p. ej. "MACD(12,26) > 0 AND RSI > 15 en las
+últimas 5 velas AND régimen alcista → LONG".
+
+Evaluación:
+- Reduce mucho el espacio de búsqueda y, con eso, los falsos positivos: cada
+  hipótesis tiene una razón de ser y se prueban menos.
+- Propuesta de implementación: plantillas "contexto + disparador":
+  - contexto (estado lento): régimen de tendencia en una temporalidad mayor,
+    nivel de volatilidad;
+  - disparador (evento rápido): cruce, pullback, ruptura;
+  - dirección coherente: LONG en régimen alcista, SHORT en bajista.
+  Los parámetros dentro de cada plantilla se siguen sorteando, pero con rangos acotados.
+- Requiere primero features de régimen en temporalidades mayores (EXP-003).
+

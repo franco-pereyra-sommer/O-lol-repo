@@ -111,6 +111,12 @@ def fold_summary(i: int, res: SearchResult, df_index: pd.DatetimeIndex, seg: dic
                                     if len(val) else float("nan")),
     }
     row["oos_pooled_lift_net"] = row["oos_pooled_mean_net"] - row["base_val_mean_net"]
+    # Mismo retorno OOS bajo cada escenario de costos (robustez a los costos)
+    for col in [c for c in val.columns if c.startswith("mean_net_return_")
+                and c != "mean_net_return_excl_ambiguous"]:
+        sc = col[len("mean_net_return_"):]
+        row[f"oos_pooled_mean_net_{sc}"] = _pooled(val, col)
+        row[f"base_val_mean_net_{sc}"] = base.get(col, float("nan"))
     return row
 
 
@@ -151,7 +157,12 @@ def run_walk_forward(cfg: ResearchConfig, df: pd.DataFrame,
         "folds_oos_net_gt0": int((valid["oos_pooled_mean_net"] > 0).sum()),
         "folds_oos_beat_base": int((valid["oos_pooled_lift_net"] > 0).sum()),
         "total_conditions_evaluated": int(summary["n_evaluated"].sum()),
+        "cost_scenario": cfg.COST_SCENARIO,
     }
+    for col in [c for c in summary.columns if c.startswith("oos_pooled_mean_net_")]:
+        sc = col[len("oos_pooled_mean_net_"):]
+        agg[f"oos_pooled_mean_net_all_folds_{sc}"] = _pooled(allval, f"mean_net_return_{sc}")
+        agg[f"folds_oos_net_gt0_{sc}"] = int((summary[col] > 0).sum())
     hold = None
     if cfg.RUN_TEST_EVALUATION and holdout is not None:
         t = results[-1].results.get("TEST", pd.DataFrame())

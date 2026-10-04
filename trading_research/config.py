@@ -166,14 +166,31 @@ class ResearchConfig:
     )
 
     # ------------------------------------------------------------------ #
-    # Costos simulados (fracciones, p. ej. 0.001 = 0.1 %)
+    # Costos de ejecución (ver trading_research/costs.py)
     # ------------------------------------------------------------------ #
-    # COMMISSION_RATE: comisión del exchange cobrada sobre el nocional en
-    #   CADA lado (entrada y salida).
-    # SLIPPAGE_RATE: desplazamiento adverso del precio de ejecución respecto
-    #   del precio teórico, en CADA lado (impacto/latencia).
-    # SPREAD_RATE: spread bid-ask COMPLETO relativo al precio medio. Se paga
-    #   medio spread al entrar y medio spread al salir.
+    # COST_SCENARIO: escenario que se usa para los filtros y el retorno neto
+    #   principal ("net_return", "mean_net_return").
+    # COST_SCENARIOS_REPORT: escenarios que se calculan además, como
+    #   mean_net_return_<escenario>, para ver si un resultado depende de
+    #   suponer costos optimistas.
+    # Spread y slippage son ESTIMACIONES (con OHLC no se pueden observar).
+    COST_SCENARIO: str = "typical"
+    COST_SCENARIOS_REPORT: tuple[str, ...] = ("optimistic", "typical", "conservative")
+    COST_SCENARIO_PARAMS: dict[str, dict[str, Any]] = field(default_factory=lambda: {
+        "optimistic": {"fee_schedule": "binance_spot_bnb", "spread": 0.00002, "slippage": 0.00005},
+        "typical": {"fee_schedule": "binance_spot", "spread": 0.0001, "slippage": 0.0002},
+        "conservative": {"fee_schedule": "binance_spot", "spread": 0.0005, "slippage": 0.0003,
+                         "slippage_vol_k": 0.05, "slippage_vol_period": 14},
+    })
+    # Salida por TP con orden límite ya colocada ("maker") o de mercado ("taker").
+    TP_ORDER_TYPE: str = "maker"
+    # Tamaño de cada operación en USD. Los modelos actuales no dependen de él;
+    # queda en la interfaz para modelos de slippage por profundidad del libro.
+    POSITION_SIZE_USD: float = 1000.0
+
+    # Escenario "custom" (el modelo simple anterior, todo como orden de mercado):
+    # COMMISSION_RATE: comisión por lado. SLIPPAGE_RATE: slippage por lado.
+    # SPREAD_RATE: spread completo (se paga la mitad al entrar y la mitad al salir).
     COMMISSION_RATE: float = 0.001
     SLIPPAGE_RATE: float = 0.0005
     SPREAD_RATE: float = 0.0002
@@ -232,6 +249,12 @@ class ResearchConfig:
             raise ValueError("WF_N_FOLDS >= 1 y WF_TRAIN_VAL_RATIO > 0.")
         if not 0 <= self.WF_HOLDOUT_FRACTION < 1:
             raise ValueError("WF_HOLDOUT_FRACTION debe estar en [0, 1).")
+        known = set(self.COST_SCENARIO_PARAMS) | {"custom"}
+        for sc in (self.COST_SCENARIO, *self.COST_SCENARIOS_REPORT):
+            if sc not in known:
+                raise ValueError(f"Escenario de costos desconocido: {sc} (opciones: {sorted(known)}).")
+        if self.TP_ORDER_TYPE not in ("maker", "taker"):
+            raise ValueError("TP_ORDER_TYPE debe ser 'maker' o 'taker'.")
         if self.MAX_HOLDING_BARS < 1:
             raise ValueError("MAX_HOLDING_BARS debe ser >= 1.")
         if not (self.TP_PERCENT > 0 and 0 < self.SL_PERCENT < 1):

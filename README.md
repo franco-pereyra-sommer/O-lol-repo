@@ -55,6 +55,29 @@ Lo que hay que mirar es la consistencia entre folds (`wf_summary.csv`):
 cuántos folds tienen retorno fuera de muestra > 0 y cuántos superan a la
 línea base de su período, no sólo el promedio.
 
+## Costos de ejecución
+
+`trading_research/costs.py` separa precio teórico, precio efectivo y comisión,
+con tres piezas intercambiables: comisión (por exchange, maker/taker), spread
+y slippage. Cada tramo usa su tipo de orden: entrada de mercado (taker), TP
+con orden límite (maker, sin spread ni slippage), SL con stop de mercado y
+salida por tiempo de mercado (taker).
+
+| Escenario | Comisión | Spread | Slippage |
+|---|---|---|---|
+| `optimistic` | Binance con BNB, 0,075 % | 0,002 % | 0,005 % |
+| `typical` (por defecto) | Binance estándar, 0,10 % | 0,01 % | 0,02 % |
+| `conservative` | Binance estándar, 0,10 % | 0,05 % | 0,03 % + 0,05 × ATR(14)/Close |
+| `custom` | `--commission` | `--spread` | `--slippage` (modelo anterior) |
+
+Comisiones: binance.com/en/fee/trading, usuario regular, consultado 2026-10-04.
+**Spread y slippage son estimaciones**: con velas OHLC no se pueden observar.
+`--cost-scenario` elige el escenario de los filtros; los resultados incluyen
+además `mean_net_return_<escenario>` para los tres, para ver si algo sólo
+funciona con costos optimistas. Para agregar un exchange o un modelo con
+bid/ask u order book se implementa otra clase de `FeeModel`, `SpreadModel` o
+`SlippageModel` sin tocar el resto.
+
 ## Opciones de línea de comandos
 
 `python run_research.py --help` lista todas. Las más usadas:
@@ -69,7 +92,8 @@ línea base de su período, no sólo el promedio.
 | `--filter-mode absolute\|lift\|both` | Umbrales fijos, mejora sobre la línea base del segmento, o ambos |
 | `--min-lift-p-tp 0.03` / `--min-lift-return 0` | Umbrales del modo lift |
 | `--pool-size 150` | Piezas simples usadas para construir las condiciones complejas |
-| `--commission --slippage --spread` | Costos por lado |
+| `--cost-scenario typical` | Escenario de costos (ver arriba) |
+| `--commission --slippage --spread` | Costos del escenario `custom` |
 | `--walk-forward --wf-folds 5 --wf-ratio 3` | Walk-forward (ver arriba) |
 
 Con más de una combinación de TP/SL/horizonte se crea `results/grid_<fecha>/`
@@ -100,6 +124,7 @@ Etapa 1 (simples, TRAIN) → pool → Etapa 2 (complejas, TRAIN) → filtros
 | `condition_generator.py` | generación aleatoria reproducible, etapas 1 y 2 |
 | `entry_detector.py` | entrada en `Open[t+1]`, cooldown por condición, purga de horizonte |
 | `outcome_evaluator.py` | tabla de resultados por vela de entrada |
+| `costs.py` | modelo de ejecución: comisiones por exchange, spread, slippage, escenarios |
 | `statistics.py` | métricas por condición, línea base, IC de Wilson |
 | `validation.py` | split cronológico, filtros |
 | `walk_forward.py` | folds, búsqueda por fold, resumen fuera de muestra |

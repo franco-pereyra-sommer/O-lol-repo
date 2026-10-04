@@ -271,3 +271,47 @@ def test_cache_eviction_keeps_results():
     for c in conds:
         assert np.array_equal(c.evaluate(small), c.evaluate(big))
     assert small._feature_bytes <= small.max_feature_bytes + 2000 * 8
+
+
+def test_execution_cost_model():
+    from trading_research.costs import (EXIT_SL, EXIT_TIME, EXIT_TP, MarketContext,
+                                        build_cost_model)
+    df = random_walk(300)
+    ctx = MarketContext(df)
+    cfg = ResearchConfig()
+    P, X = np.array([100.0, 100.0, 100.0]), np.array([105.0, 98.0, 101.0])
+    kind = np.array([EXIT_TP, EXIT_SL, EXIT_TIME])
+    idx = np.array([50, 50, 50])
+    typ = build_cost_model("typical", cfg)
+    net = typ.net_return("LONG", P, X, kind, idx, idx + 5, ctx)
+    a = 0.0001 / 2 + 0.0002          # medio spread + slippage (típico)
+    f = 0.001
+    p_e = 100 * (1 + a)
+    assert net[0] == pytest.approx(105 * (1 - f) / (p_e * (1 + f)) - 1)          # TP maker: sin spread/slip
+    assert net[1] == pytest.approx(98 * (1 - a) * (1 - f) / (p_e * (1 + f)) - 1)  # SL stop de mercado
+    # orden esperable de escenarios
+    nets = {sc: build_cost_model(sc, cfg).net_return("LONG", P, X, kind, idx, idx + 5, ctx)
+            for sc in ("optimistic", "typical", "conservative")}
+    assert np.all(nets["optimistic"] > nets["typical"]) and np.all(nets["typical"] > nets["conservative"])
+    # SHORT con precio plano: pierde sólo los costos
+    sh = typ.net_return("SHORT", P[:1], P[:1], np.array([EXIT_TIME]), idx[:1], idx[:1], ctx)[0]
+    lo = typ.net_return("LONG", P[:1], P[:1], np.array([EXIT_TIME]), idx[:1], idx[:1], ctx)[0]
+    assert sh < 0 and sh == pytest.approx(lo, rel=0.01)
+
+
+def test_volatility_slippage_is_causal():
+    from trading_research.costs import MarketContext, VolatilitySlippage
+    df = random_walk(400)
+    m = VolatilitySlippage(0.0003, 0.05)
+    full = m.slippage(np.arange(400), MarketContext(df))
+    trunc = m.slippage(np.arange(250), MarketContext(df.iloc[:250]))
+    assert np.allclose(full[:250][20:], trunc[20:])   # no depende de velas posteriores
+
+
+def test_outcome_table_has_cost_scenarios():
+    df = random_walk(500)
+    t = build_outcome_table(df, ResearchConfig(MAX_HOLDING_BARS=20))
+    assert set(t.net_by_scenario) == {"optimistic", "typical", "conservative"}
+    assert np.allclose(t.net_return, t.net_by_scenario["typical"], equal_nan=True)
+    ok = np.isfinite(t.net_return)
+    assert np.all(t.net_by_scenario["optimistic"][ok] >= t.net_by_scenario["conservative"][ok])

@@ -38,11 +38,11 @@ Abajo se detalla LONG; SHORT es el espejo.
   (sobre TODO el horizonte H, independientemente de si TP/SL cerraron antes:
    describen el camino del precio, no la operación).
 
-Costos (por operación completa; a = slippage + spread/2, c = comisión):
-  LONG : compra a P(1+a), vende a X(1-a)
-         neto = X(1-a)(1-c) / (P(1+a)(1+c)) - 1
-  SHORT: vende a P(1-a), recompra a X(1+a)
-         neto = [P(1-a)(1-c) - X(1+a)(1+c)] / (P(1-a))
+Costos: los calcula el modelo de ejecución de costs.py según el tipo de
+salida (TP con orden límite, SL con stop de mercado, tiempo con orden de
+mercado). Se calcula un retorno neto por cada escenario de costos:
+  net_return            -> escenario principal (COST_SCENARIO)
+  net_by_scenario[name] -> cada escenario de COST_SCENARIOS_REPORT
 
 Resultados favorables generales: siempre se miden desde el punto de vista de
 la POSICIÓN. Para SHORT, "reach p" = el precio bajó p; "down_then_up" =
@@ -58,6 +58,7 @@ import pandas as pd
 from numpy.lib.stride_tricks import sliding_window_view
 
 from .config import PositionSide, ResearchConfig
+from .costs import EXIT_SL, EXIT_TIME, EXIT_TP, MarketContext, build_cost_model
 
 log = logging.getLogger(__name__)
 
@@ -77,6 +78,8 @@ class OutcomeTable:
     mfe: np.ndarray
     mae: np.ndarray
     favorable: dict[str, np.ndarray] = field(default_factory=dict)  # nombre -> bool
+    net_by_scenario: dict[str, np.ndarray] = field(default_factory=dict)
+    cost_scenario: str = ""
 
 
 def favorable_name(spec: dict) -> str:
@@ -112,6 +115,7 @@ def _sequence(first_mask: np.ndarray, second_mask: np.ndarray) -> np.ndarray:
 
 def apply_costs(entry: np.ndarray, exit_: np.ndarray, cfg: ResearchConfig,
                 side: str | None = None) -> np.ndarray:
+    """Modelo simple (escenario "custom"): todo como orden de mercado con tasas fijas."""
     side = side or cfg.POSITION_TYPE
     a = cfg.SLIPPAGE_RATE + cfg.SPREAD_RATE / 2.0
     c = cfg.COMMISSION_RATE
@@ -173,19 +177,41 @@ def build_outcome_table(df: pd.DataFrame, cfg: ResearchConfig) -> OutcomeTable:
     exit_off[is_sl] = k_sl[is_sl]
     exit_off[is_amb] = k_tp[is_amb]
 
+    exit_kind = np.full(m, EXIT_TIME, np.int8)
+    exit_kind[is_tp] = EXIT_TP
+    exit_kind[is_sl] = EXIT_SL
+    entry_idx = rows                      # vela de entrada e
+    exit_idx = rows + exit_off            # vela en la que se ejecuta la salida
+    ctx = MarketContext(df)
+    pol = cfg.AMBIGUOUS_RETURN_POLICY
+
     gross = ret(exit_price)
-    net = apply_costs(P, exit_price, cfg, side)
     if is_amb.any():
         g_tp, g_sl = ret(tp), ret(sl_fill)
-        n_tp, n_sl = apply_costs(P, tp, cfg, side), apply_costs(P, sl_fill, cfg, side)
-        pol = cfg.AMBIGUOUS_RETURN_POLICY
-        if pol == "worst":
-            g, nn, px = g_sl, n_sl, sl_fill
-        elif pol == "best":
-            g, nn, px = g_tp, n_tp, tp
-        else:
-            g, nn, px = (g_tp + g_sl) / 2, (n_tp + n_sl) / 2, (tp + sl_fill) / 2
-        gross[is_amb], net[is_amb], exit_price[is_amb] = g[is_amb], nn[is_amb], px[is_amb]
+        g = {"worst": g_sl, "best": g_tp, "midpoint": (g_tp + g_sl) / 2}[pol]
+        px = {"worst": sl_fill, "best": tp, "midpoint": (tp + sl_fill) / 2}[pol]
+        gross[is_amb], exit_price[is_amb] = g[is_amb], px[is_amb]
+
+    def net_for(scenario: str) -> np.ndarray:
+        model = build_cost_model(scenario, cfg)
+        net = model.net_return(side, P, exit_price, exit_kind, entry_idx, exit_idx, ctx)
+        if is_amb.any():
+            k_tp_kind = np.full(m, EXIT_TP, np.int8)
+            k_sl_kind = np.full(m, EXIT_SL, np.int8)
+            n_tp = model.net_return(side, P, tp, k_tp_kind, entry_idx, exit_idx, ctx)
+            n_sl = model.net_return(side, P, sl_fill, k_sl_kind, entry_idx, exit_idx, ctx)
+            nn = {"worst": n_sl, "best": n_tp, "midpoint": (n_tp + n_sl) / 2}[pol]
+            net[is_amb] = nn[is_amb]
+        return net
+
+    scenarios = list(dict.fromkeys([cfg.COST_SCENARIO, *cfg.COST_SCENARIOS_REPORT]))
+    nets = {sc: net_for(sc) for sc in scenarios}
+    net = nets[cfg.COST_SCENARIO]
+    for sc, arr in nets.items():
+        full_arr = np.full(n, np.nan)
+        full_arr[:m] = arr
+        tbl.net_by_scenario[sc] = full_arr
+    tbl.cost_scenario = cfg.COST_SCENARIO
 
     tbl.entry_price[:m] = P
     tbl.outcome[:m] = outcome

@@ -91,8 +91,15 @@ def parse_args() -> argparse.Namespace:
     g.add_argument("--wf-holdout", type=float, default=d.WF_HOLDOUT_FRACTION,
                    help="Fracción final reservada como TEST (no la usa ningún fold).")
 
-    g = p.add_argument_group("costos (fracciones por lado)")
-    g.add_argument("--commission", type=float, default=d.COMMISSION_RATE)
+    g = p.add_argument_group("costos (ver trading_research/costs.py)")
+    g.add_argument("--cost-scenario", choices=("optimistic", "typical", "conservative", "custom"),
+                   default=d.COST_SCENARIO,
+                   help="Escenario de costos para filtros y retorno neto principal. "
+                        "custom = usar --commission/--slippage/--spread.")
+    g.add_argument("--tp-order-type", choices=("maker", "taker"), default=d.TP_ORDER_TYPE,
+                   help="Salida por TP con orden límite (maker) o de mercado (taker).")
+    g.add_argument("--commission", type=float, default=d.COMMISSION_RATE,
+                   help="Sólo escenario custom: comisión por lado.")
     g.add_argument("--slippage", type=float, default=d.SLIPPAGE_RATE)
     g.add_argument("--spread", type=float, default=d.SPREAD_RATE, help="Spread completo.")
 
@@ -126,6 +133,7 @@ def base_config(a: argparse.Namespace) -> ResearchConfig:
         MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES=a.cooldown, COOLDOWN_MODE=a.cooldown_mode,
         AMBIGUOUS_RETURN_POLICY=a.ambiguous,
         COMMISSION_RATE=a.commission, SLIPPAGE_RATE=a.slippage, SPREAD_RATE=a.spread,
+        COST_SCENARIO=a.cost_scenario, TP_ORDER_TYPE=a.tp_order_type,
         FILTER_MODE=a.filter_mode, MIN_P_TP_FIRST=a.min_p_tp, MIN_EXPECTED_RETURN=a.min_return,
         MIN_LIFT_P_TP_FIRST=a.min_lift_p_tp, MIN_LIFT_EXPECTED_RETURN=a.min_lift_return,
         EXPECTED_RETURN_BASIS=a.return_basis,
@@ -145,7 +153,7 @@ def print_run(res: SearchResult, top: int) -> None:
     print(f"{cfg.POSITION_TYPE}  TP={cfg.TP_PERCENT:g}  SL={cfg.SL_PERCENT:g}  horizonte={cfg.MAX_HOLDING_BARS} velas  "
           f"re-entrada={cfg.COOLDOWN_MODE}"
           + (f"({cfg.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES})" if cfg.COOLDOWN_MODE == "fixed" else "")
-          + f"  filtro={cfg.FILTER_MODE}")
+          + f"  filtro={cfg.FILTER_MODE}  costos={cfg.COST_SCENARIO}")
     print(f"Condiciones evaluadas: {m['n_conditions_evaluated_total']} "
           f"({m['n_conditions_evaluated_simple']} simples + {m['n_conditions_evaluated_complex']} complejas,"
           f" pool {m['stage2_pool_size']})")
@@ -198,7 +206,7 @@ def print_walk_forward(wf: WalkForwardResult) -> None:
     print("\n" + "=" * 72)
     print(f"WALK-FORWARD  {c.POSITION_TYPE}  TP={c.TP_PERCENT:g}  SL={c.SL_PERCENT:g}  "
           f"horizonte={c.MAX_HOLDING_BARS}  {'anclado' if c.WF_ANCHORED else 'ventana móvil'}  "
-          f"filtro={c.FILTER_MODE}")
+          f"filtro={c.FILTER_MODE}  costos={c.COST_SCENARIO}")
     s = wf.summary.copy()
     for k in ("train_start", "val_start", "val_end"):
         s[k] = pd.to_datetime(s[k]).dt.strftime("%Y-%m-%d")
@@ -210,6 +218,11 @@ def print_walk_forward(wf: WalkForwardResult) -> None:
           f"(línea base promedio {ag['base_val_mean_net_avg']:.4f})")
     print(f"Folds con retorno OOS > 0: {ag['folds_oos_net_gt0']}/{ag['n_folds']}   "
           f"folds que superan la línea base: {ag['folds_oos_beat_base']}/{ag['n_folds']}")
+    scs = [k[len("oos_pooled_mean_net_all_folds_"):] for k in ag if k.startswith("oos_pooled_mean_net_all_folds_")]
+    if scs:
+        print("Según escenario de costos (retorno OOS agrupado / folds con OOS > 0):  " + "   ".join(
+            f"{sc}: {ag['oos_pooled_mean_net_all_folds_' + sc]:.4f} ({ag['folds_oos_net_gt0_' + sc]}/{ag['n_folds']})"
+            for sc in scs))
     if wf.holdout:
         h = wf.holdout
         print(f"HOLDOUT {h['start'][:10]} → {h['end'][:10]}: evaluadas {h['evaluated']} "

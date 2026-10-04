@@ -7,9 +7,14 @@ mercado. La herramienta es exploratoria: no ejecuta órdenes reales ni se
 conecta a exchanges para operar.
 
 ## Entorno
-- Windows. Python vía Pixi: correr siempre `pixi run python ...` (o
+- Computadora de escritorio, repo principal `D:\O lol\O-lol-repo` (el de
+  `C:\O lol\O lol repo` es el de la laptop). Sincronizar con git.
+- Windows. Python 3.11 vía Pixi: correr siempre `pixi run python ...` (o
   `pixi run pytest -q`) desde la raíz del repo.
-- Datos en `D:\O lol\Guardado de datos\` (CSV con columnas Date, Open, High, Low, Close, Volume).
+- El código tiene que ser compatible con **Python 3.11**: por ejemplo, no usar
+  dentro de un f-string las mismas comillas que lo delimitan.
+- Datos: CSV con columnas Date, Open, High, Low, Close, Volume, en la carpeta
+  `Guardado de datos` (confirmar la ruta en esta computadora antes de usarla).
 - Historia larga: `pixi run python -m trading_research.binance_data --symbol BTCUSDT --interval 1h --out "<ruta>.csv"`.
 
 ## Modo de trabajo autónomo
@@ -22,7 +27,8 @@ correr experimentos sin pedir permiso en cada paso, siguiendo este ciclo:
 4. Hacer el cambio de código (con tests si toca la lógica) y correr `pixi run pytest -q`.
 5. Correr el experimento en walk-forward.
 6. Registrar resultado, lectura, decisión y próximo paso en `RESEARCH_LOG.md`.
-7. Hacer commit de código + bitácora con un mensaje `EXP-NNN: ...`.
+7. Hacer commit de código + bitácora con un mensaje `EXP-NNN: ...` (el
+   usuario autorizó los commits; no hacer push sin preguntar).
 
 ## Reglas que no se rompen
 - Decidir sólo con métricas walk-forward fuera de muestra. No inspeccionar
@@ -33,7 +39,8 @@ correr experimentos sin pedir permiso en cada paso, siguiendo este ciclo:
 - Ningún cambio puede introducir look-ahead: el test
   `test_no_lookahead_truncation_invariance` tiene que seguir pasando, y toda
   feature nueva necesita un test de causalidad equivalente.
-- No bajar los costos para "hacer que algo funcione".
+- No bajar los costos para "hacer que algo funcione". Las decisiones se toman
+  con el escenario `typical`; `optimistic` sólo se reporta.
 - Leer resúmenes (`wf_summary.csv`, `grid_summary.csv`, `meta.json`), no los
   CSV completos de resultados ni `events.csv.gz`, salvo que haga falta.
 
