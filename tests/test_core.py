@@ -261,6 +261,32 @@ def test_walk_forward_folds():
                 assert tr.n_bars == folds[0]["TRAIN"].n_bars
 
 
+def test_walk_forward_short_windows():
+    from trading_research.walk_forward import make_folds
+    cfg = ResearchConfig(WF_TRAIN_BARS=2500, WF_VAL_BARS=720, WF_HOLDOUT_FRACTION=0.1, MAX_HOLDING_BARS=100)
+    folds, hold = make_folds(20000, cfg)
+    n_dev = 20000 - hold.n_bars
+    assert len(folds) == (n_dev - 2500) // 720
+    assert folds[-1]["VALIDATION"].end <= n_dev
+    for i, f in enumerate(folds):
+        tr, va = f["TRAIN"], f["VALIDATION"]
+        assert tr.n_bars == 2500 and va.n_bars == 720 and tr.end == va.start
+        if i:
+            assert va.start == folds[i - 1]["VALIDATION"].end
+    with pytest.raises(ValueError):
+        ResearchConfig(WF_TRAIN_BARS=2500).validate()
+
+
+def test_pooled_t_matches_direct():
+    from trading_research.walk_forward import pooled_t
+    rng = np.random.default_rng(0)
+    a, b = rng.normal(0.01, 0.02, 300), rng.normal(0.0, 0.03, 200)
+    df = pd.DataFrame({"n_entries": [300, 200], "mean_net_return": [a.mean(), b.mean()],
+                       "std_net_return": [a.std(ddof=1), b.std(ddof=1)]})
+    x = np.concatenate([a, b])
+    assert pooled_t(df) == pytest.approx(x.mean() / (x.std(ddof=1) / np.sqrt(len(x))), rel=1e-9)
+
+
 def test_cache_eviction_keeps_results():
     df = random_walk(2000)
     small = FeatureStore(df, max_feature_mb=0.05, max_signal_mb=0.01)

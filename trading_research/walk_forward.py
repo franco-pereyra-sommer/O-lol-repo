@@ -50,9 +50,15 @@ def make_folds(n_bars: int, cfg: ResearchConfig) -> tuple[list[dict[str, Segment
     """Devuelve (folds, holdout). Cada fold es {"TRAIN": Segment, "VALIDATION": Segment}."""
     n_hold = int(round(n_bars * cfg.WF_HOLDOUT_FRACTION))
     n_dev = n_bars - n_hold
-    k, r = cfg.WF_N_FOLDS, cfg.WF_TRAIN_VAL_RATIO
-    val_bars = int(n_dev // (r + k))
-    train_bars = int(round(r * val_bars))
+    if cfg.WF_TRAIN_BARS is not None:
+        val_bars, train_bars = cfg.WF_VAL_BARS, cfg.WF_TRAIN_BARS
+        k = (n_dev - train_bars) // val_bars
+        if k < 1:
+            raise ValueError("Datos insuficientes para WF_TRAIN_BARS + WF_VAL_BARS.")
+    else:
+        k, r = cfg.WF_N_FOLDS, cfg.WF_TRAIN_VAL_RATIO
+        val_bars = int(n_dev // (r + k))
+        train_bars = int(round(r * val_bars))
     if val_bars < 2 * cfg.MAX_HOLDING_BARS:
         raise ValueError(
             f"Cada VALIDATION tendría {val_bars} velas, muy poco para un horizonte de "
@@ -86,6 +92,24 @@ def _pooled(df: pd.DataFrame, col: str) -> float:
     x = df[col].to_numpy(float)
     ok = np.isfinite(x)
     return float((w[ok] * x[ok]).sum() / w[ok].sum()) if ok.any() else float("nan")
+
+
+def pooled_t(df: pd.DataFrame, col: str = "mean_net_return") -> float:
+    """t de la media de todas las entradas OOS juntas, a partir de media, desvío y N de cada condición.
+
+    Las entradas de condiciones distintas pueden coincidir en la misma vela, así que
+    el t está inflado (no son independientes). Es una cota optimista, no una prueba."""
+    if not len(df) or df["n_entries"].sum() < 2:
+        return float("nan")
+    n = df["n_entries"].to_numpy(float)
+    m = df[col].to_numpy(float)
+    s = df["std_net_return"].to_numpy(float)
+    ok = np.isfinite(m) & np.isfinite(s) & (n > 0)
+    n, m, s = n[ok], m[ok], s[ok]
+    N = n.sum()
+    mu = (n * m).sum() / N
+    var = (((n - 1) * s ** 2).sum() + (n * (m - mu) ** 2).sum()) / (N - 1)
+    return float(mu / np.sqrt(var / N)) if var > 0 else float("nan")
 
 
 def fold_summary(i: int, res: SearchResult, df_index: pd.DatetimeIndex, seg: dict[str, Segment]) -> dict:
@@ -156,6 +180,8 @@ def run_walk_forward(cfg: ResearchConfig, df: pd.DataFrame,
         "base_val_mean_net_avg": float(summary["base_val_mean_net"].mean()),
         "folds_oos_net_gt0": int((valid["oos_pooled_mean_net"] > 0).sum()),
         "folds_oos_beat_base": int((valid["oos_pooled_lift_net"] > 0).sum()),
+        "oos_pooled_t_all_folds": pooled_t(allval),
+        "oos_total_entries": int(allval["n_entries"].sum()) if len(allval) else 0,
         "total_conditions_evaluated": int(summary["n_evaluated"].sum()),
         "cost_scenario": cfg.COST_SCENARIO,
     }

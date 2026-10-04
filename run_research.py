@@ -88,6 +88,10 @@ def parse_args() -> argparse.Namespace:
                    help="Largo del TRAIN de cada fold dividido por el largo de su VALIDATION.")
     g.add_argument("--wf-anchored", action="store_true",
                    help="TRAIN anclado al inicio (crece) en lugar de ventana móvil.")
+    g.add_argument("--wf-train-bars", type=int, default=d.WF_TRAIN_BARS,
+                   help="Ventanas cortas: velas de TRAIN (junto con --wf-val-bars; ignora --wf-folds/--wf-ratio).")
+    g.add_argument("--wf-val-bars", type=int, default=d.WF_VAL_BARS,
+                   help="Ventanas cortas: velas de VALIDATION; la ventana avanza de a este paso.")
     g.add_argument("--wf-holdout", type=float, default=d.WF_HOLDOUT_FRACTION,
                    help="Fracción final reservada como TEST (no la usa ningún fold).")
 
@@ -140,7 +144,8 @@ def base_config(a: argparse.Namespace) -> ResearchConfig:
         MIN_CASES_ABSOLUTE=a.min_cases, MIN_CASES_FRACTION=a.min_cases_frac,
         RUN_TEST_EVALUATION=a.run_test, OUTPUT_DIR=a.output, SAVE_EVENTS=not a.no_events,
         WALK_FORWARD=a.walk_forward, WF_N_FOLDS=a.wf_folds, WF_TRAIN_VAL_RATIO=a.wf_ratio,
-        WF_ANCHORED=a.wf_anchored, WF_HOLDOUT_FRACTION=a.wf_holdout,
+        WF_ANCHORED=a.wf_anchored,
+        WF_TRAIN_BARS=a.wf_train_bars, WF_VAL_BARS=a.wf_val_bars, WF_HOLDOUT_FRACTION=a.wf_holdout,
     )
     if a.csv:
         cfg.DATA_SOURCE, cfg.CSV_PATH = "csv", a.csv
@@ -216,6 +221,8 @@ def print_walk_forward(wf: WalkForwardResult) -> None:
     print(f"\nFuera de muestra (todas las VALIDATION juntas, condiciones seleccionadas en su TRAIN): "
           f"retorno neto medio {ag['oos_pooled_mean_net_all_folds']:.4f}  "
           f"(línea base promedio {ag['base_val_mean_net_avg']:.4f})")
+    print(f"Entradas OOS totales: {ag['oos_total_entries']}   t del retorno OOS agrupado (inflado, ver pooled_t): "
+          f"{ag['oos_pooled_t_all_folds']:.2f}")
     print(f"Folds con retorno OOS > 0: {ag['folds_oos_net_gt0']}/{ag['n_folds']}   "
           f"folds que superan la línea base: {ag['folds_oos_beat_base']}/{ag['n_folds']}")
     scs = [k[len("oos_pooled_mean_net_all_folds_"):] for k in ag if k.startswith("oos_pooled_mean_net_all_folds_")]

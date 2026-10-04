@@ -60,6 +60,12 @@ class ResearchConfig:
     WF_TRAIN_VAL_RATIO: float = 3.0
     WF_ANCHORED: bool = False
     WF_HOLDOUT_FRACTION: float = 0.15
+    # Ventanas cortas (idea A): si se fijan ambos, se ignoran WF_N_FOLDS y
+    # WF_TRAIN_VAL_RATIO. El TRAIN dura WF_TRAIN_BARS velas, la VALIDATION
+    # (= "situación real", fuera de muestra) WF_VAL_BARS, y la ventana avanza de a
+    # WF_VAL_BARS: las VALIDATION son contiguas y no se solapan.
+    WF_TRAIN_BARS: int | None = None
+    WF_VAL_BARS: int | None = None
 
     # ------------------------------------------------------------------ #
     # Indicadores: rangos de parámetros que el generador puede explorar
@@ -247,6 +253,8 @@ class ResearchConfig:
             raise ValueError("COOLDOWN_MODE debe ser 'fixed' o 'until_exit'.")
         if self.WF_N_FOLDS < 1 or self.WF_TRAIN_VAL_RATIO <= 0:
             raise ValueError("WF_N_FOLDS >= 1 y WF_TRAIN_VAL_RATIO > 0.")
+        if (self.WF_TRAIN_BARS is None) != (self.WF_VAL_BARS is None):
+            raise ValueError("WF_TRAIN_BARS y WF_VAL_BARS se fijan juntos.")
         if not 0 <= self.WF_HOLDOUT_FRACTION < 1:
             raise ValueError("WF_HOLDOUT_FRACTION debe estar en [0, 1).")
         known = set(self.COST_SCENARIO_PARAMS) | {"custom"}

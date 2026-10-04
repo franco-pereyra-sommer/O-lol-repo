@@ -184,6 +184,19 @@ Lectura: LONG "le gana" a la línea base en 8/10 folds, pero por márgenes de ±
 Decisión: se mantiene esto como referencia. Holdout cerrado. No hay candidato.
 Próximo paso: EXP-002 (ventanas cortas, idea A) según el Plan: re-buscar seguido para adaptarse al régimen, y evaluarlo como procedimiento. Pendiente de implementar y testear.
 
+### EXP-002 — Walk-forward de ventanas cortas (2026-10-04)
+Hipótesis: re-buscar condiciones seguido (TRAIN ~3,5 meses) y operarlas sólo el mes siguiente permite adaptarse al régimen, así que el procedimiento tendría retorno OOS agrupado mejor que en EXP-001 (LONG −0,14 %). Expectativa honesta: sigue ≤ 0 en `typical`; con TRAIN de ~2.500 velas, las seleccionadas son más ruido que señal.
+Cambio: nuevo modo de folds por largo en velas (`--wf-train-bars 2500 --wf-val-bars 720`, ≈ 3,5 meses y 1 mes; la VALIDATION es la "situación real", sin TEST intermedio ni extensión de ventana). Agregado además el t del retorno OOS agrupado y el total de entradas OOS al resumen (criterio 4). Tests nuevos: `test_walk_forward_short_windows`, `test_pooled_t_matches_direct`. Las features no cambiaron (test de causalidad intacto).
+Comando: `pixi run python run_research.py --csv "D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv" --walk-forward --wf-train-bars 2500 --wf-val-bars 720 --side LONG SHORT --tp 0.05 --sl 0.03 --horizon 100 --cooldown-mode until_exit --filter-mode both --cost-scenario typical --no-events --output results/exp002`
+Hipótesis probadas en este experimento: 1.350.000 (7.500 × 90 folds × 2 lados) (acumulado: 1.500.000, sin contar EXP-000).
+Resultado (`typical`, 90 folds de VAL = 1 mes cada uno, contiguos):
+- LONG: neto OOS agrupado −0,19 % (línea base −0,19 %, o sea lift ≈ 0); folds OOS > 0: 39/90; superan la base: 52/90; 895.090 entradas OOS; t agrupado −49 (inflado, pero negativo). Por escenario: optimistic −0,11 %, conservative −0,34 % (32/90).
+- SHORT: −0,15 % (línea base −0,29 %); 37/90 con OOS > 0; superan la base 31/90; 492.594 entradas; t −28. Optimistic −0,06 %, conservative −0,30 %.
+- Sin lado que cumpla el criterio de candidato (neto OOS < 0 en los tres escenarios y t muy negativo).
+Lectura: re-buscar mensualmente no mejoró nada respecto de EXP-001 (LONG −0,14 % → −0,19 %): el lift de LONG es ≈ 0 en el agregado. En SHORT el agregado supera a la base en +0,14 pp, pero sólo en 31/90 folds, es decir, el efecto lo da una minoría de folds (probablemente con muchas entradas) y no es consistente. Lo que se selecciona en 3,5 meses de TRAIN no se mantiene el mes siguiente: el efecto del costo (~0,25 %) domina y las selecciones son ruido. La idea A, tal como está implementada (misma búsqueda aleatoria de condiciones, sólo ventanas más cortas), no aporta.
+Decisión: se descarta la idea A como mejora por sí sola; se deja el modo de ventanas cortas disponible (`--wf-train-bars/--wf-val-bars`) para evaluar experimentos posteriores. Holdout cerrado. No hay candidato. Cuenta de experimentos seguidos sin avance: 2.
+Próximo paso: EXP-003 (features de régimen: tendencia en 4h/diario y volatilidad relativa), requisito de la idea B. Se evaluará con el walk-forward de EXP-001 (10 folds, más rápido: ~10 min por lado) como referencia.
+
 ---
 
 ## 4. Plan
