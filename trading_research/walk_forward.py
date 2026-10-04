@@ -112,6 +112,19 @@ def pooled_t(df: pd.DataFrame, col: str = "mean_net_return") -> float:
     return float(mu / np.sqrt(var / N)) if var > 0 else float("nan")
 
 
+def fold_level_t(summary: pd.DataFrame, col: str = "oos_pooled_mean_net") -> float:
+    """t de la media de `col` ENTRE folds (cada fold con el mismo peso; los folds con
+    entradas OOS = los que tienen valor). Es un error estándar agrupado por fold: las
+    VALIDATION son períodos disjuntos, así que esas medias son mucho más cercanas a
+    independientes que las entradas (que se solapan en el tiempo y entre condiciones).
+    Con K folds, comparar con una t de Student de K-1 grados de libertad."""
+    x = summary[col].to_numpy(float)
+    x = x[np.isfinite(x)]
+    if len(x) < 2 or x.std(ddof=1) == 0:
+        return float("nan")
+    return float(x.mean() / (x.std(ddof=1) / np.sqrt(len(x))))
+
+
 def fold_summary(i: int, res: SearchResult, df_index: pd.DatetimeIndex, seg: dict[str, Segment]) -> dict:
     val = res.results["VALIDATION"]
     base = res.baselines["VALIDATION"]
@@ -181,6 +194,7 @@ def run_walk_forward(cfg: ResearchConfig, df: pd.DataFrame,
         "folds_oos_net_gt0": int((valid["oos_pooled_mean_net"] > 0).sum()),
         "folds_oos_beat_base": int((valid["oos_pooled_lift_net"] > 0).sum()),
         "oos_pooled_t_all_folds": pooled_t(allval),
+        "oos_fold_level_t": fold_level_t(summary),
         "oos_total_entries": int(allval["n_entries"].sum()) if len(allval) else 0,
         "total_conditions_evaluated": int(summary["n_evaluated"].sum()),
         "cost_scenario": cfg.COST_SCENARIO,

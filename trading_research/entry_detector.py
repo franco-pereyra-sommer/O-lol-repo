@@ -57,6 +57,33 @@ class EntryDetection:
     n_dropped_cooldown: int      # señales descartadas por cooldown
 
 
+def trade_intervals(entry_idx: np.ndarray, holding_bars: int,
+                    exit_offset: np.ndarray | None = None) -> dict[str, np.ndarray]:
+    """
+    Intervalos temporales de cada operación (posiciones enteras en el DataFrame):
+      signal_idx   t        vela de confirmación (la señal sólo usa datos <= t)
+      entry_idx    e = t+1  precio de entrada = Open[e]
+      exit_idx     e+k      vela en la que sale (TP/SL/tiempo); sólo si se pasa exit_offset
+      info_end_idx e+H-1    ÚLTIMA vela que toca el resultado de la operación. Es la que
+                            decide purga/embargo: MFE/MAE y las métricas "favorables" miran
+                            todo el horizonte aunque TP/SL cierren antes, así que el
+                            intervalo de información es [t, e+H-1], no [t, exit].
+    Una operación puede evaluarse en un segmento [start, end) sin filtrar información de
+    otro segmento si y sólo si start <= t y info_end_idx <= end-1 (ver `fits_in_segment`).
+    """
+    e = np.asarray(entry_idx, dtype=np.int64)
+    out = {"signal_idx": e - 1, "entry_idx": e, "info_end_idx": e + holding_bars - 1}
+    if exit_offset is not None:
+        out["exit_idx"] = e + exit_offset[e].astype(np.int64)
+    return out
+
+
+def fits_in_segment(entry_idx: np.ndarray, holding_bars: int, segment: Segment) -> np.ndarray:
+    """Máscara: el intervalo [t, e+H-1] de la operación cae entero dentro del segmento."""
+    iv = trade_intervals(entry_idx, holding_bars)
+    return (iv["signal_idx"] >= segment.start) & (iv["info_end_idx"] <= segment.end - 1)
+
+
 def apply_cooldown(candidates: np.ndarray, cooldown: int) -> np.ndarray:
     """Filtro greedy: acepta la primera señal y salta las siguientes `cooldown`-1 velas."""
     if cooldown <= 1 or len(candidates) == 0:

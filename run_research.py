@@ -221,8 +221,8 @@ def print_walk_forward(wf: WalkForwardResult) -> None:
     print(f"\nFuera de muestra (todas las VALIDATION juntas, condiciones seleccionadas en su TRAIN): "
           f"retorno neto medio {ag['oos_pooled_mean_net_all_folds']:.4f}  "
           f"(línea base promedio {ag['base_val_mean_net_avg']:.4f})")
-    print(f"Entradas OOS totales: {ag['oos_total_entries']}   t del retorno OOS agrupado (inflado, ver pooled_t): "
-          f"{ag['oos_pooled_t_all_folds']:.2f}")
+    print(f"Entradas OOS totales: {ag['oos_total_entries']}   t entre entradas (inflado): "
+          f"{ag['oos_pooled_t_all_folds']:.2f}   t entre folds: {ag['oos_fold_level_t']:.2f}")
     print(f"Folds con retorno OOS > 0: {ag['folds_oos_net_gt0']}/{ag['n_folds']}   "
           f"folds que superan la línea base: {ag['folds_oos_beat_base']}/{ag['n_folds']}")
     scs = [k[len("oos_pooled_mean_net_all_folds_"):] for k in ag if k.startswith("oos_pooled_mean_net_all_folds_")]

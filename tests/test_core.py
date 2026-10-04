@@ -287,6 +287,117 @@ def test_pooled_t_matches_direct():
     assert pooled_t(df) == pytest.approx(x.mean() / (x.std(ddof=1) / np.sqrt(len(x))), rel=1e-9)
 
 
+# ---------------------------------------------------------------------- #
+# EXP-003: purga / embargo / dependencia temporal
+# ---------------------------------------------------------------------- #
+def _random_signal(n, p, seed):
+    return np.random.default_rng(seed).random(n) < p
+
+
+@pytest.mark.parametrize("mode,cd", [("fixed", 1), ("fixed", 15), ("until_exit", 1)])
+def test_trade_label_window_stays_inside_segment(mode, cd):
+    """Purga implícita: el intervalo [t, e+H-1] de CADA entrada cae dentro de su segmento,
+    para cualquier cooldown. Es lo que impide que una operación de TRAIN use precios de VAL."""
+    from trading_research.entry_detector import fits_in_segment, trade_intervals
+    H = 40
+    df = random_walk(3000, 3)
+    tb = build_outcome_table(df, ResearchConfig(MAX_HOLDING_BARS=H))
+    sig = _random_signal(3000, 0.2, 4)
+    for seg in (Segment("TRAIN", 0, 1500), Segment("VALIDATION", 1500, 2100), Segment("TEST", 2100, 3000)):
+        d = detect_entries(sig, seg, H, cd, mode, tb.exit_offset)
+        assert len(d.entry_idx)
+        assert fits_in_segment(d.entry_idx, H, seg).all()
+        iv = trade_intervals(d.entry_idx, H, tb.exit_offset)
+        assert (iv["exit_idx"] <= iv["info_end_idx"]).all() and iv["exit_idx"].max() <= seg.end - 1
+        # y es exactamente el criterio: toda señal que sí cabe se conserva (modo fixed, cooldown 1)
+        if (mode, cd) == ("fixed", 1):
+            raw = np.flatnonzero(sig[seg.start:seg.end]) + seg.start
+            assert set(d.confirm_idx) == {t for t in raw if t + 1 + H - 1 <= seg.end - 1}
+            assert d.n_dropped_horizon == len(raw) - len(d.confirm_idx)
+
+
+def _pipeline_cfg(**kw):
+    return ResearchConfig(MAX_CONDITION_DEPTH=1, N_SIMPLE_CONDITIONS=300, MAX_HOLDING_BARS=40,
+                          TP_PERCENT=0.03, SL_PERCENT=0.02, MIN_CASES_ABSOLUTE=5,
+                          MIN_CASES_FRACTION=0.0, SAVE_EVENTS=False, FILTER_MODE="absolute",
+                          MIN_P_TP_FIRST=0.0, MIN_EXPECTED_RETURN=-1.0, **kw)
+
+
+def test_train_results_do_not_depend_on_future_prices():
+    """Cambiar TODOS los precios posteriores al fin de TRAIN no puede alterar nada de lo que
+    se ve en TRAIN (condiciones generadas, entradas, retornos, selección)."""
+    from trading_research.search import ResearchPipeline
+    n, cut = 2600, 1500
+    a = random_walk(n, 11)
+    b = a.copy()
+    other = random_walk(n, 99)
+    scale = a["Close"].iloc[cut - 1] / other["Close"].iloc[cut - 1]
+    for col in ("Open", "High", "Low", "Close"):
+        b.iloc[cut:, b.columns.get_loc(col)] = other[col].to_numpy()[cut:] * scale
+    segs = {"TRAIN": Segment("TRAIN", 0, cut), "VALIDATION": Segment("VALIDATION", cut, 2200)}
+    ra = ResearchPipeline(_pipeline_cfg(), df=a, segments=segs).run()
+    rb = ResearchPipeline(_pipeline_cfg(), df=b, segments=segs).run()
+    ta = ra.results["TRAIN"].sort_values("condition_id").reset_index(drop=True)
+    tb_ = rb.results["TRAIN"].sort_values("condition_id").reset_index(drop=True)
+    assert len(ta) > 50
+    cols = ["condition_id", "n_entries", "n_dropped_horizon", "mean_net_return", "P_TP_FIRST",
+            "mean_MFE", "mean_MAE", "passed"]
+    pd.testing.assert_frame_equal(ta[cols], tb_[cols])
+    assert ra.baselines["TRAIN"]["mean_net_return"] == rb.baselines["TRAIN"]["mean_net_return"]
+    # el cambio sí es visible en VALIDATION (control de que el test puede fallar)
+    assert ra.baselines["VALIDATION"]["mean_net_return"] != rb.baselines["VALIDATION"]["mean_net_return"]
+
+    # Control negativo: SIN purga por horizonte (H=0) las entradas del final de TRAIN sí cambiarían.
+    cfg = _pipeline_cfg()
+    ta_, tb2 = build_outcome_table(a, cfg), build_outcome_table(b, cfg)
+    e = np.arange(cut - cfg.MAX_HOLDING_BARS, cut)
+    assert not np.allclose(ta_.net_return[e], tb2.net_return[e], equal_nan=True)
+
+
+def test_validation_labels_use_only_validation_prices():
+    """Simétrico: una operación del COMIENZO de VAL no usa precios de TRAIN en su resultado
+    (sólo el indicador que genera la señal puede mirar atrás, lo cual es causal y legítimo)."""
+    cfg = _pipeline_cfg()
+    a = random_walk(2600, 5)
+    b = a.copy()
+    cut = 1500
+    for col in ("Open", "High", "Low", "Close"):
+        b.iloc[:cut, b.columns.get_loc(col)] = a[col].to_numpy()[:cut] * 1.37
+    ta, tb_ = build_outcome_table(a, cfg), build_outcome_table(b, cfg)
+    e = np.arange(cut, 2200)
+    # gross_return/outcome no cambian (sólo la volatilidad usada en costos puede mirar atrás)
+    assert np.array_equal(ta.outcome[e], tb_.outcome[e])
+    assert np.allclose(ta.gross_return[e], tb_.gross_return[e])
+
+
+def test_overlap_inflates_t_but_until_exit_does_not():
+    """Simulación de nulidad (señales aleatorias, sin ventaja): con cooldown 1 y horizonte 50 las
+    operaciones se solapan y el t naive rechaza H0 mucho más del 5 %; con until_exit no."""
+    H = 50
+    cfg = ResearchConfig(MAX_HOLDING_BARS=H, TP_PERCENT=0.05, SL_PERCENT=0.05)
+    seg = Segment("S", 0, 5000)
+    ts = {"fixed1": [], "until_exit": []}
+    for seed in range(40):
+        df = random_walk(5000, seed)
+        tb = build_outcome_table(df, cfg)
+        sig = _random_signal(5000, 0.1, seed + 1000)
+        for k, (mode, cd) in {"fixed1": ("fixed", 1), "until_exit": ("until_exit", 1)}.items():
+            d = detect_entries(sig, seg, H, cd, mode, tb.exit_offset)
+            r = tb.gross_return[d.entry_idx]
+            ts[k].append(r.mean() / (r.std(ddof=1) / np.sqrt(len(r))))
+    assert np.std(ts["fixed1"]) > 1.4          # inflado (debería ser ~1)
+    assert np.mean(np.abs(ts["fixed1"]) > 2) > 0.15   # falsos positivos >> 5 %
+    assert np.mean(np.abs(ts["until_exit"]) > 2) <= 0.05
+
+
+def test_fold_level_t():
+    from trading_research.walk_forward import fold_level_t
+    s = pd.DataFrame({"oos_pooled_mean_net": [0.01, 0.03, -0.01, np.nan, 0.02]})
+    x = np.array([0.01, 0.03, -0.01, 0.02])
+    assert fold_level_t(s) == pytest.approx(x.mean() / (x.std(ddof=1) / 2))
+    assert np.isnan(fold_level_t(pd.DataFrame({"oos_pooled_mean_net": [0.01]})))
+
+
 def test_cache_eviction_keeps_results():
     df = random_walk(2000)
     small = FeatureStore(df, max_feature_mb=0.05, max_signal_mb=0.01)
