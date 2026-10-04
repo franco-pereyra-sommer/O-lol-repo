@@ -5,10 +5,76 @@ retorno esperado positivo **fuera de muestra** y de forma **consistente** en
 distintos períodos del mercado. Encontrar "algo que funcionó en el pasado" no
 alcanza: con miles de pruebas, siempre aparece algo por azar.
 
-Este archivo tiene tres partes:
+Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
+0. Estado actual y guía de lectura: qué se hizo, qué resultó y qué sigue, sin jerga.
 1. Glosario: qué significa cada valor de los resultados y cómo se calcula.
 2. Reglas de decisión, fijadas ANTES de ver resultados.
 3. Bitácora de experimentos: qué se probó, qué dio, qué se decidió y qué sigue.
+
+---
+
+## 0. Estado actual y guía de lectura
+
+*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-04, con EXP-007 en curso. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
+
+### 0.1 En pocas palabras
+- **Qué se busca:** reglas de entrada (por ejemplo "RSI cruza tal valor y la media corta supera a la larga") que den ganancia **después de costos**, en datos que la regla **no vio** al elegirse, y de forma repetible en distintos períodos del mercado.
+- **Dónde estamos:** con BTCUSDT 1h (2017-2026) **ninguna variante probada gana dinero fuera de muestra** (EXP-001, 002, 005). No hay "candidato" y el tramo final de datos reservado (holdout) **sigue sin abrirse**.
+- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007. Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
+
+### 0.2 Experimentos: estado y conclusión (una línea cada uno)
+| Experimento | Qué fue | Estado | Conclusión |
+|---|---|---|---|
+| EXP-000 | Punto de partida con datos de Yahoo (2 años) | Cerrado | Con 2 años no se distingue señal de régimen de mercado; pasar a historia larga. |
+| EXP-001 | Línea base con 9 años de Binance, walk-forward de 10 folds, LONG y SHORT | Cerrado | LONG −0,14 % y SHORT −0,61 % por operación fuera de muestra: sin candidato. |
+| EXP-002 | Re-buscar cada mes (TRAIN de 3,5 meses, 90 folds) | Cerrado | No mejora (LONG −0,19 %, SHORT −0,15 %); la idea "ventanas cortas" sola no ayuda. |
+| EXP-003 | ¿Hay filtración de información entre TRAIN y VALIDATION? (purga/embargo) | Cerrado | **No hay filtración.** El problema era otro: un número de confianza inflado. Se corrigió el estadístico. |
+| EXP-004 | Cómo corregir por probar miles de condiciones (Reality Check y PBO) | Cerrado | Se implementaron y validaron con simulaciones; se midió que "la mejor condición" se degrada fuera de muestra. |
+| EXP-005 | Reality Check sobre las 4 variantes ya corridas | Cerrado | p ≈ 0,9–1,0: ninguna es distinguible de cero ni de la línea base. |
+| EXP-006 | Segunda prueba de look-ahead (que ninguna señal use datos futuros) | Cerrado | 0 fugas en 5.000 condiciones. Un look-ahead leve en el costo del escenario `conservative` fue corregido. |
+| EXP-007 | Operaciones superpuestas: qué estadístico es válido y qué cooldown conviene | **En curso** | Parte A ya dio resultado (ver su entrada); la Parte B (procedimiento completo) está corriendo. |
+
+### 0.3 Respuestas a las preguntas de revisión
+
+**1. EXP-003 (purga y embargo).** Detalle en la entrada EXP-003.
+- *Qué se entendió:* **purga** = sacar del TRAIN toda observación cuyo resultado depende de precios del período evaluado; **embargo** = además dejar un margen de TRAIN **posterior** al período evaluado. Éste sólo existe si se entrena con datos posteriores al test (K-fold, CPCV); en un walk-forward que sólo avanza hacia adelante no corresponde.
+- *Sobre `n_dropped_horizon`:* resultó que **sí resuelve la filtración entre segmentos**: descartar toda señal cuyo horizonte se sale del segmento es exactamente una purga. Lo que **no** resuelve (ni debe) es el **solapamiento entre operaciones**, que es otro problema: no es filtración sino dependencia estadística (varias operaciones comparten las mismas velas) y hace que el número "t" parezca mejor de lo que es.
+- *Qué cambió en el código:* `trade_intervals` y `fits_in_segment` (hacen explícita la regla de purga; el comportamiento no cambió) y `fold_level_t` (nuevo estadístico entre folds), en `entry_detector.py` y `walk_forward.py`.
+- *Tests agregados:* la ventana de cada operación cae dentro de su segmento (verificado que el test falla si se rompe la purga); cambiar todos los precios posteriores al TRAIN no altera ninguna métrica de TRAIN; simulación de que el solapamiento infla el t; test del t entre folds.
+- *¿Cambió resultados?* **No cambió ningún resultado de EXP-001/002** (el walk-forward estaba bien). Sí se **enmendó el criterio de candidato** (regla 4): pasó de "t ≥ 3 entre todas las entradas" a "t ≥ 3 **entre folds**", que es más exigente.
+
+**2. EXP-004 (Reality Check y PBO).** Detalle en la entrada EXP-004.
+- *¿Análisis serio o versión simplificada?* Análisis completo (qué es una hipótesis, universo, benchmark, estadístico, bootstrap respetando el tiempo, costos, relación con el walk-forward, límites) **y** una implementación real, no simplificada, de las dos herramientas, validada con simulaciones: con ruido puro el Reality Check rechaza ≈ 5 % (el "mejor de 200 reglas" parece significativo el 100 % de las veces si no se corrige) y detecta una ventaja real; la PBO da ≈ 0,5 con ruido y ≈ 0 con ventaja estable.
+- *Universo de hipótesis:* tres niveles (condición; procedimiento completo; programa de investigación = todas las variantes probadas contra los mismos datos). Se corrige por el tercero, porque dentro de un fold la selección ya se hace en TRAIN y se mide en VALIDATION.
+- *¿Faltaba infraestructura?* Sí, para aplicar el Reality Check a datos reales: faltaba la serie de resultados fuera de muestra por procedimiento. **Se construyó y se aplicó en EXP-005.** Siguen sin implementar: SPA (variante del Reality Check), Deflated Sharpe Ratio, CPCV, PBO sobre el lift. Están en el Plan (ítem 11).
+- *Qué recomendó:* el listado de 8 evidencias necesarias para poder decir "probablemente no es azar" (final de EXP-004), una cuenta K de variantes (regla 7) y volver recién después a ampliar la búsqueda.
+
+**3. Estado del roadmap.**
+- EXP-001/002 están **cerrados y reproducidos** (se repitieron en EXP-005 y dieron los mismos números al dígito).
+- Terminados: EXP-000 a EXP-006 (ver 0.2). En curso: EXP-007.
+- **Pendiente de la tabla original** (sección 4, Plan): revisión estadística de operaciones superpuestas (= EXP-007, en curso); features de régimen (tendencia en 4h/diario, volatilidad); condiciones "contexto + disparador"; TP/SL proporcionales al ATR; volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
+- La numeración vieja (EXP-003 = régimen, EXP-004 = contexto+disparador) **ya fue reemplazada** en la sección 4.
+
+**4. Próximo experimento (propuesta, la decisión es tuya).**
+1. Cerrar EXP-007 (define cómo se medirá todo lo siguiente: qué cooldown usar y qué estadístico es el estándar).
+2. Después, volver a lo experimental. Lo más coherente con el plan es **features de régimen** (tendencia en temporalidades mayores y volatilidad relativa), porque son el requisito de "contexto + disparador". Tras agregarlas hay que correr `run_lookahead.py` (regla de EXP-006) y comparar contra las 4 variantes con el Reality Check (K sube a 5, 6…).
+3. Alternativa si prefieres más validez antes de más capacidad: CPCV o PBO sobre el lift.
+- *Decisiones tomadas por Claude que conviene que conozcas y puedas revertir:* (a) se enmendó el criterio de candidato a "t entre folds ≥ 3" (EXP-003); (b) se fijó en 1 % el ATR supuesto en las primeras velas del modelo de slippage (EXP-006); (c) se agregó la regla 7 (Bonferroni con la cuenta K).
+
+### 0.4 Mini-glosario sin jerga (el glosario técnico está en la sección 1)
+- **Fuera de muestra (OOS):** datos que la regla no usó para elegirse. Es lo único que cuenta.
+- **Walk-forward:** probar el procedimiento repetidas veces: elegir con un tramo del pasado y medir en el tramo siguiente, avanzando en el tiempo.
+- **Look-ahead:** que una regla use, sin querer, información del futuro. Hace que todo parezca mejor de lo real.
+- **Purga / embargo:** descartar datos cuya información se solapa con el tramo que se evalúa, para que no se contaminen.
+- **t entre folds:** número que dice cuántos errores estándar está el resultado lejos de cero, calculado entre períodos disjuntos (honesto); el t entre operaciones está inflado porque las operaciones se solapan.
+- **Reality Check / PBO:** herramientas contra la "suerte del mejor entre muchos": la primera da una probabilidad de que el mejor sea azar; la segunda mide cuánto se degrada lo que se eligió como mejor.
+- **Holdout:** último tramo de datos guardado bajo llave; se abre una sola vez, para un solo candidato.
+- **K:** cantidad de variantes del procedimiento probadas contra los mismos datos; cuantas más, más exigente hay que ser.
+
+### 0.5 Dónde está cada cosa
+- Bitácora detallada: sección 3 de este archivo. Resultados en `results/` (no se versiona).
+- Código: `trading_research/` (núcleo), `run_research.py` (búsqueda y walk-forward), `run_reality_check.py`, `run_pbo.py`, `run_lookahead.py`, `run_overlap_study.py`. Tests: `pixi run pytest -q`.
+- Datos: `D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv` (fuera del repo).
 
 ---
 
