@@ -40,7 +40,7 @@ import pandas as pd
 from .config import ResearchConfig
 from .entry_detector import Segment
 from .features import FeatureStore
-from .outcome_evaluator import build_outcome_table
+from .outcome_evaluator import OutcomeTable, build_outcome_table
 from .search import ResearchPipeline, SearchResult, _json_default, save_results
 
 log = logging.getLogger(__name__)
@@ -83,6 +83,7 @@ class WalkForwardResult:
     aggregate: dict[str, Any]
     holdout: dict[str, Any] | None = None
     fold_dirs: list[Path] = field(default_factory=list)
+    oos_series: dict[str, np.ndarray] | None = None   # arrays de largo n (ver oos_series_arrays)
 
 
 def _pooled(df: pd.DataFrame, col: str) -> float:
@@ -110,6 +111,20 @@ def pooled_t(df: pd.DataFrame, col: str = "mean_net_return") -> float:
     mu = (n * m).sum() / N
     var = (((n - 1) * s ** 2).sum() + (n * (m - mu) ** 2).sum()) / (N - 1)
     return float(mu / np.sqrt(var / N)) if var > 0 else float("nan")
+
+
+def oos_series_arrays(entry_lists: list[np.ndarray], table: OutcomeTable, n: int) -> dict[str, np.ndarray]:
+    """Serie OOS por vela de UN fold, a partir de las entradas de todas las condiciones
+    seleccionadas en su TRAIN y evaluadas en su VALIDATION. Para cada vela de entrada:
+      cnt        cantidad de operaciones abiertas en esa vela (todas las condiciones)
+      sum_<sc>   suma de sus retornos netos con el escenario de costos <sc>
+    El retorno de la vela es sum/cnt (promedio simple entre operaciones) y 0 si cnt = 0
+    (efectivo). Ver EXP-004 / EXP-005."""
+    e = np.concatenate(entry_lists) if entry_lists else np.zeros(0, dtype=np.int64)
+    out = {"cnt": np.bincount(e, minlength=n).astype(float)}
+    for sc, arr in table.net_by_scenario.items():
+        out[f"sum_{sc}"] = np.bincount(e, weights=arr[e], minlength=n)
+    return out
 
 
 def fold_level_t(summary: pd.DataFrame, col: str = "oos_pooled_mean_net") -> float:
@@ -165,6 +180,11 @@ def run_walk_forward(cfg: ResearchConfig, df: pd.DataFrame,
     folds, holdout = make_folds(len(df), cfg)
     close = df["Close"].to_numpy()
     results, rows = [], []
+    n_bars = len(df)
+    series = {"covered": np.zeros(n_bars, dtype=bool), "cnt": np.zeros(n_bars)}
+    for sc in table.net_by_scenario:
+        series[f"sum_{sc}"] = np.zeros(n_bars)
+        series[f"base_{sc}"] = np.full(n_bars, np.nan)
     for i, seg in enumerate(folds, 1):
         last = i == len(folds)
         fcfg = dataclasses.replace(
@@ -175,7 +195,15 @@ def run_walk_forward(cfg: ResearchConfig, df: pd.DataFrame,
         log.info("Fold %d/%d: TRAIN %s → %s | VAL %s → %s", i, len(folds),
                  df.index[seg["TRAIN"].start].date(), df.index[seg["TRAIN"].end - 1].date(),
                  df.index[seg["VALIDATION"].start].date(), df.index[seg["VALIDATION"].end - 1].date())
-        res = ResearchPipeline(fcfg, df=df, store=store, segments=segs, table=table).run()
+        pipe = ResearchPipeline(fcfg, df=df, store=store, segments=segs, table=table)
+        res = pipe.run()
+        va = seg["VALIDATION"]
+        part = oos_series_arrays(pipe.oos_entries, table, n_bars)
+        for k, v in part.items():
+            series[k][va.slice] += v[va.slice]
+        series["covered"][va.slice] = True
+        for sc in table.net_by_scenario:
+            series[f"base_{sc}"][va.slice] = res.baselines["VALIDATION"].get(f"mean_net_return_{sc}", np.nan)
         results.append(res)
         r = fold_summary(i, res, df.index, seg)
         va = seg["VALIDATION"]
@@ -211,7 +239,7 @@ def run_walk_forward(cfg: ResearchConfig, df: pd.DataFrame,
                 "evaluated": int(len(t)), "passed": int(t["passed"].sum()) if len(t) else 0,
                 "pooled_mean_net": _pooled(t, "mean_net_return"),
                 "base_mean_net": b.get("mean_net_return")}
-    return WalkForwardResult(cfg, results, summary, agg, hold)
+    return WalkForwardResult(cfg, results, summary, agg, hold, oos_series=series)
 
 
 def save_walk_forward(wf: WalkForwardResult, output_dir: str | Path) -> Path:
@@ -224,6 +252,8 @@ def save_walk_forward(wf: WalkForwardResult, output_dir: str | Path) -> Path:
         d = save_results(res, str(out / f"fold_{i}"))
         wf.fold_dirs.append(d)
     wf.summary.to_csv(out / "wf_summary.csv", index=False)
+    if wf.oos_series is not None:
+        np.savez_compressed(out / "oos_series.npz", **wf.oos_series)
     (out / "wf_aggregate.json").write_text(json.dumps(
         {"aggregate": wf.aggregate, "holdout": wf.holdout, "config": c.to_dict()},
         indent=2, default=_json_default))

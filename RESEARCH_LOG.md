@@ -293,6 +293,12 @@ Estado actual: ningún procedimiento supera el paso 3; las pruebas de PBO muestr
 Decisión: sin candidato; holdout cerrado. Se mantiene el contador de hipótesis (1.531.500) y se agrega la regla K a la sección 2. Experimentos seguidos sin avance: 2 (EXP-003/004 fueron metodológicos, no cuentan).
 Próximo paso: volver a la hoja de ruta (sección 4). Lo siguiente con más valor para esta línea es `procedure_oos_series` + RC sobre las 4 variantes ya corridas, antes de agregar capacidad de búsqueda.
 
+### EXP-005 — Serie OOS del walk-forward y Reality Check sobre las 4 variantes [EN CURSO] (2026-10-04)
+Hipótesis (escrita antes de correr): sobre la historia OOS común de las K = 4 variantes (EXP-001 y EXP-002, LONG y SHORT), el Reality Check NO rechaza H0 "ninguna variante rinde > 0 neto" (p > 0,05) con el benchmark cero, y tampoco con el benchmark "exceso sobre la línea base". Esperado: la mejor variante es EXP-001 LONG o EXP-002 SHORT, con p ajustado claramente > 0,05.
+Especificación fijada antes de ver resultados (no se cambia después de mirar): universo = las 4 variantes; serie por vela = promedio simple de los retornos netos de las operaciones abiertas en esa vela por TODAS las condiciones seleccionadas en TRAIN (0 si ninguna; efectivo); período = intersección de las velas de VALIDATION de las 4 variantes; costos `typical` (primario) y `conservative` (sensibilidad); benchmarks: (a) cero, (b) media de la línea base del fold restada en las velas con operación; estadístico = máximo del t estudentizado; bootstrap estacionario, bloque medio 300 (= 3H) primario, 100 y 600 como sensibilidad; 1.000 remuestreos (semilla 0). Se reportan también los p-valores individuales (K = 1) y el ajuste de Bonferroni para compararlos.
+Cambio de código: el walk-forward guarda `oos_series.npz` (cnt, sum por escenario, línea base por vela, velas cubiertas) y la corrida repite EXP-001 y EXP-002 con la misma configuración y semilla (determinista: no son hipótesis nuevas; acumulado sin cambio: 1.531.500; K = 4). Test nuevo `test_walk_forward_oos_series_matches_fold_results`.
+Comandos: los de EXP-001 y EXP-002 (arriba) con `--output results/exp005/exp001` y `results/exp005/exp002`; luego `run_reality_check.py`.
+
 ---
 
 ## 4. Plan

@@ -81,6 +81,9 @@ class ResearchPipeline:
         self.rng = np.random.default_rng(cfg.RANDOM_SEED)
         self.generator = ConditionGenerator(cfg, self.store, self.segments["TRAIN"].slice, self.rng)
         self.params = run_parameters(cfg)
+        # Entradas (vela de entrada) de TODAS las condiciones evaluadas en VALIDATION, para
+        # armar la serie OOS del procedimiento (walk_forward.oos_series_arrays).
+        self.oos_entries: list[np.ndarray] = []
 
     # ------------------------------------------------------------------ #
     def evaluate(self, cond: Condition, segment: Segment, stage: str,
@@ -89,6 +92,8 @@ class ResearchPipeline:
         det = detect_entries(sig, segment, self.cfg.MAX_HOLDING_BARS,
                              self.cfg.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES,
                              self.cfg.COOLDOWN_MODE, self.table.exit_offset)
+        if stage == "validation":
+            self.oos_entries.append(det.entry_idx)
         cid = condition_id(cond)
         row: dict[str, Any] = {"condition_id": cid, "condition": cond.describe(),
                                "segment": segment.name, "stage": stage,

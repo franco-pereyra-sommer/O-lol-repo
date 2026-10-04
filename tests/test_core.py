@@ -398,6 +398,30 @@ def test_fold_level_t():
     assert np.isnan(fold_level_t(pd.DataFrame({"oos_pooled_mean_net": [0.01]})))
 
 
+def test_walk_forward_oos_series_matches_fold_results(tmp_path):
+    """La serie OOS por vela es consistente con los resultados por condición: la suma de retornos
+    netos y el conteo de entradas coinciden, y sólo hay datos en las velas de VALIDATION."""
+    from trading_research.walk_forward import make_folds, run_walk_forward, save_walk_forward
+    df = random_walk(3500, 21)
+    cfg = _pipeline_cfg(WF_TRAIN_BARS=800, WF_VAL_BARS=300, WF_HOLDOUT_FRACTION=0.1, WALK_FORWARD=True)
+    wf = run_walk_forward(cfg, df)
+    s = wf.oos_series
+    folds, _ = make_folds(len(df), cfg)
+    cov = np.zeros(len(df), dtype=bool)
+    for f in folds:
+        cov[f["VALIDATION"].slice] = True
+    assert np.array_equal(s["covered"], cov)
+    assert s["cnt"][~cov].sum() == 0 and s["sum_typical"][~cov].sum() == 0
+    tot_n = sum(int(r.results["VALIDATION"]["n_entries"].sum()) for r in wf.folds)
+    tot_sum = sum(float((r.results["VALIDATION"]["n_entries"] * r.results["VALIDATION"]["mean_net_return"]).sum())
+                  for r in wf.folds)
+    assert tot_n > 1000 and s["cnt"].sum() == tot_n
+    assert s["sum_typical"].sum() == pytest.approx(tot_sum, rel=1e-9)
+    out = save_walk_forward(wf, tmp_path)
+    z = np.load(out / "oos_series.npz")
+    assert np.array_equal(z["cnt"], s["cnt"]) and "base_typical" in z.files
+
+
 def test_cache_eviction_keeps_results():
     df = random_walk(2000)
     small = FeatureStore(df, max_feature_mb=0.05, max_signal_mb=0.01)
