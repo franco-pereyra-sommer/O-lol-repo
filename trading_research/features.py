@@ -181,6 +181,77 @@ class ATRPercent(Operand):
 
 
 @dataclass(frozen=True, repr=False)
+class HTFTrend(Operand):
+    """
+    Tendencia en una temporalidad mayor (EXP-008): Close de la última vela superior COMPLETA dividido
+    por la media de sus últimos n cierres (también de velas completas), menos 1. Positivo = por
+    encima de su tendencia.
+
+    Causalidad: la vela superior que contiene la vela i (de `base_min` minutos, abierta en ts_i) se
+    considera completa al cierre de i sólo si ts_i + base cae exactamente en el borde de la vela
+    superior; si no, se usa la vela superior anterior. Nunca se mira una vela superior abierta ni
+    ninguna vela posterior a i. Las velas superiores se alinean al reloj UTC (época Unix):
+    4h = 00,04,08…, 1D = 00:00 UTC (igual que Binance); la zona horaria del índice no influye
+    (se usa la época UTC) y un índice sin zona se interpreta como UTC.
+    """
+    tf: str          # "4h" o "1D"
+    n: int
+    base_min: int = 60
+
+    @property
+    def key(self): return f"htf:{self.tf}:{self.n}:{self.base_min}"
+    @property
+    def label(self): return f"HTFTrend({self.tf},{self.n})"
+    @property
+    def scale(self): return f"htftrend_{self.tf}"
+
+    def compute(self, df):
+        ts = df.index.as_unit("ns").asi8.astype("int64")   # ns UTC (tz-aware: ya es UTC; la unidad del índice puede ser s, ms, us)
+        tf_ns = int(pd.Timedelta(self.tf).value)
+        base_ns = int(self.base_min) * 60 * 10 ** 9
+        bucket = ts // tf_ns
+        new_run = np.r_[True, bucket[1:] != bucket[:-1]]
+        rid = np.cumsum(new_run) - 1                   # índice de vela superior (por tramo)
+        last = np.flatnonzero(np.r_[new_run[1:], True])   # última vela base de cada tramo
+        hclose = df["Close"].to_numpy(dtype="float64")[last]
+        sma = np.full(len(hclose), np.nan)
+        if len(hclose) >= self.n:
+            cs = np.cumsum(np.r_[0.0, hclose])
+            sma[self.n - 1:] = (cs[self.n:] - cs[:-self.n]) / self.n
+        trend = hclose / sma - 1.0
+        final = ((ts + base_ns) % tf_ns) == 0          # esta vela cierra su vela superior
+        k = np.where(final, rid, rid - 1)
+        out = np.full(len(df), np.nan)
+        ok = k >= 0
+        out[ok] = trend[k[ok]]
+        return out
+
+    def to_dict(self): return {"type": "htf_trend", "tf": self.tf, "n": self.n, "base_min": self.base_min}
+
+
+@dataclass(frozen=True, repr=False)
+class RelativeVolatility(Operand):
+    """Volatilidad relativa (EXP-008): ATR(corto) / ATR(largo). > 1 = la volatilidad reciente supera a su nivel de largo plazo."""
+    short: int
+    long: int
+
+    @property
+    def key(self): return f"relvol:{self.short}:{self.long}"
+    @property
+    def label(self): return f"ATR({self.short})/ATR({self.long})"
+    @property
+    def scale(self): return "relvol"
+
+    def compute(self, df):
+        a = Indicator("ATR", (self.short,)).compute(df)
+        b = Indicator("ATR", (self.long,)).compute(df)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            return a / b
+
+    def to_dict(self): return {"type": "rel_vol", "short": self.short, "long": self.long}
+
+
+@dataclass(frozen=True, repr=False)
 class Constant(Operand):
     value: float
 
@@ -208,6 +279,10 @@ def operand_from_dict(d: dict[str, Any]) -> Operand:
         return ATRPercent(int(d["period"]))
     if t == "const":
         return Constant(float(d["value"]))
+    if t == "htf_trend":
+        return HTFTrend(d["tf"], int(d["n"]), int(d.get("base_min", 60)))
+    if t == "rel_vol":
+        return RelativeVolatility(int(d["short"]), int(d["long"]))
     raise ValueError(f"Operando desconocido: {d}")
 
 

@@ -102,6 +102,16 @@ class ResearchConfig:
     # Los umbrales numéricos de las condiciones se sortean entre estos
     # cuantiles de la distribución del operando en TRAIN (nunca VALID/TEST).
     THRESHOLD_QUANTILE_RANGE: tuple[float, float] = (0.05, 0.95)
+
+    # Features de régimen/contexto (EXP-008). Apagadas por defecto: con REGIME_FEATURES=False el
+    # generador hace exactamente las mismas llamadas al azar que antes (misma semilla -> mismas
+    # condiciones). Encendidas, se suman tres familias de operandos: tendencia 4h, tendencia diaria
+    # y volatilidad relativa ATR(corto)/ATR(largo).
+    REGIME_FEATURES: bool = False
+    HTF_TREND_PERIOD_RANGE_4H: tuple[int, int] = (6, 60)     # n velas de 4h (1 a 10 días)
+    HTF_TREND_PERIOD_RANGE_1D: tuple[int, int] = (5, 100)    # n velas diarias
+    RELVOL_SHORT_RANGE: tuple[int, int] = (5, 30)
+    RELVOL_LONG_RANGE: tuple[int, int] = (60, 300)
     # Cifras significativas al redondear umbrales (legibilidad).
     THRESHOLD_SIGNIFICANT_DIGITS: int = 3
     # Probabilidades relativas de cada tipo de condición simple.

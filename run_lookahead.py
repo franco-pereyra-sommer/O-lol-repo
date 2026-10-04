@@ -48,10 +48,12 @@ def main() -> None:
     p.add_argument("--n-ks", type=int, default=12)
     p.add_argument("--horizon", type=int, default=100)
     p.add_argument("--seed", type=int, default=11)
+    p.add_argument("--regime-features", action="store_true")
     p.add_argument("--out", default=None)
     a = p.parse_args()
 
-    cfg0 = ResearchConfig(DATA_SOURCE="csv", CSV_PATH=a.csv, MAX_CONDITION_DEPTH=3)
+    cfg0 = ResearchConfig(DATA_SOURCE="csv", CSV_PATH=a.csv, MAX_CONDITION_DEPTH=3,
+                          REGIME_FEATURES=a.regime_features)
     df = load_data(cfg0)
     n = len(df)
     rng = np.random.default_rng(a.seed)

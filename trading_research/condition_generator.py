@@ -22,11 +22,12 @@ import logging
 import math
 
 import numpy as np
+import pandas as pd
 
 from .conditions import And, Compare, Condition, Cross, Not, OccurredWithin, Or, Then
 from .config import ResearchConfig
-from .features import (ATRPercent, CandleFeature, Constant, FeatureStore, Indicator,
-                       Operand, PriceField, ReturnFeature)
+from .features import (ATRPercent, CandleFeature, Constant, FeatureStore, HTFTrend, Indicator,
+                       Operand, PriceField, RelativeVolatility, ReturnFeature)
 from .indicators import param_ranges
 
 log = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class ConditionGenerator:
         self.train_slice = train_slice
         self.rng = rng
         self.ranges = param_ranges(cfg)
+        self.base_min = max(1, int(round(pd.Timedelta(cfg.TIMEFRAME).total_seconds() / 60)))
 
     # ------------------------------------------------------------------ #
     # Operandos
@@ -76,9 +78,22 @@ class ConditionGenerator:
             return PriceField(self._choice(("Open", "High", "Low", "Close")) if u < 0.1 else "Close")
         return self._indicator(self._choice(("SMA", "EMA")))
 
+    def _regime_operand(self, kind: str) -> Operand:
+        c = self.cfg
+        if kind == "htf4":
+            return HTFTrend("4h", self._randint(c.HTF_TREND_PERIOD_RANGE_4H), self.base_min)
+        if kind == "htf1d":
+            return HTFTrend("1D", self._randint(c.HTF_TREND_PERIOD_RANGE_1D), self.base_min)
+        return RelativeVolatility(self._randint(c.RELVOL_SHORT_RANGE), self._randint(c.RELVOL_LONG_RANGE))
+
     def _threshold_operand(self) -> Operand:
         """Operandos con escala estable en el tiempo (aptos para umbral fijo)."""
-        kind = self._choice(("rsi", "return", "candle", "atr_pct", "macd_zero"))
+        kinds = ("rsi", "return", "candle", "atr_pct", "macd_zero")
+        if self.cfg.REGIME_FEATURES:
+            kinds += ("htf4", "htf1d", "relvol")
+        kind = self._choice(kinds)
+        if kind in ("htf4", "htf1d", "relvol"):
+            return self._regime_operand(kind)
         if kind == "rsi":
             return self._indicator("RSI")
         if kind == "return":
@@ -105,9 +120,14 @@ class ConditionGenerator:
 
     def _operand_pair(self) -> tuple[Operand, Operand]:
         """Dos operandos de la MISMA escala y distintos entre sí."""
-        fam = self._choice(("price", "price", "rsi", "macd", "atr_pct", "return", "candle"))
+        fams = ("price", "price", "rsi", "macd", "atr_pct", "return", "candle")
+        if self.cfg.REGIME_FEATURES:
+            fams += ("htf4", "htf1d", "relvol")
+        fam = self._choice(fams)
         for _ in range(20):
-            if fam == "price":
+            if fam in ("htf4", "htf1d", "relvol"):
+                a, b = self._regime_operand(fam), self._regime_operand(fam)
+            elif fam == "price":
                 a, b = self._price_like(), self._price_like()
             elif fam == "rsi":
                 a, b = self._indicator("RSI"), self._indicator("RSI")
