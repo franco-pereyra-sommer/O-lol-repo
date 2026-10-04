@@ -9,6 +9,8 @@ La configuración completa se guarda junto con los resultados de cada corrida
 """
 from __future__ import annotations
 
+import warnings
+
 import dataclasses
 import json
 from dataclasses import dataclass, field
@@ -236,6 +238,12 @@ class ResearchConfig:
 
     # ------------------------------------------------------------------ #
     def validate(self) -> None:
+        if (self.COOLDOWN_MODE == "fixed"
+                and self.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES < self.MAX_HOLDING_BARS):
+            warnings.warn(
+                "COOLDOWN_MODE='fixed' con cooldown < horizonte: las operaciones de una condición se "
+                "solapan y el t entre entradas queda inflado (EXP-007). Preferir 'until_exit'.",
+                stacklevel=2)
         total = self.TRAIN_FRACTION + self.VALIDATION_FRACTION + self.TEST_FRACTION
         if abs(total - 1.0) > 1e-9:
             raise ValueError(f"TRAIN+VALIDATION+TEST debe sumar 1 (suma {total}).")

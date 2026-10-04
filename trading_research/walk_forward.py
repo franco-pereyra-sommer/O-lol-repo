@@ -40,6 +40,7 @@ import pandas as pd
 from .config import ResearchConfig
 from .entry_detector import Segment
 from .features import FeatureStore
+from .multiple_testing import newey_west_t, procedure_series
 from .outcome_evaluator import OutcomeTable, build_outcome_table
 from .search import ResearchPipeline, SearchResult, _json_default, save_results
 
@@ -223,6 +224,10 @@ def run_walk_forward(cfg: ResearchConfig, df: pd.DataFrame,
         "folds_oos_beat_base": int((valid["oos_pooled_lift_net"] > 0).sum()),
         "oos_pooled_t_all_folds": pooled_t(allval),
         "oos_fold_level_t": fold_level_t(summary),
+        # t HAC (Newey-West, 3H rezagos) de la serie OOS por vela del procedimiento (EXP-007)
+        "oos_hac_t_3H": newey_west_t(
+            procedure_series(series, cfg.COST_SCENARIO)[series["covered"]], 3 * cfg.MAX_HOLDING_BARS)
+        if cfg.COST_SCENARIO in table.net_by_scenario else float("nan"),
         "oos_total_entries": int(allval["n_entries"].sum()) if len(allval) else 0,
         "total_conditions_evaluated": int(summary["n_evaluated"].sum()),
         "cost_scenario": cfg.COST_SCENARIO,

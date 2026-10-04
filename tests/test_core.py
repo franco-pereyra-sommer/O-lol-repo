@@ -398,6 +398,13 @@ def test_fold_level_t():
     assert np.isnan(fold_level_t(pd.DataFrame({"oos_pooled_mean_net": [0.01]})))
 
 
+def test_fixed_cooldown_shorter_than_horizon_warns():
+    with pytest.warns(UserWarning, match="until_exit"):
+        ResearchConfig(COOLDOWN_MODE="fixed", MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES=15,
+                       MAX_HOLDING_BARS=100).validate()
+    ResearchConfig(COOLDOWN_MODE="until_exit").validate()
+
+
 def test_walk_forward_oos_series_matches_fold_results(tmp_path):
     """La serie OOS por vela es consistente con los resultados por condición: la suma de retornos
     netos y el conteo de entradas coinciden, y sólo hay datos en las velas de VALIDATION."""
@@ -417,6 +424,7 @@ def test_walk_forward_oos_series_matches_fold_results(tmp_path):
                   for r in wf.folds)
     assert tot_n > 1000 and s["cnt"].sum() == tot_n
     assert s["sum_typical"].sum() == pytest.approx(tot_sum, rel=1e-9)
+    assert np.isfinite(wf.aggregate["oos_hac_t_3H"])
     out = save_walk_forward(wf, tmp_path)
     z = np.load(out / "oos_series.npz")
     assert np.array_equal(z["cnt"], s["cnt"]) and "base_typical" in z.files
