@@ -76,6 +76,15 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 - Código: `trading_research/` (núcleo), `run_research.py` (búsqueda y walk-forward), `run_reality_check.py`, `run_pbo.py`, `run_lookahead.py`, `run_overlap_study.py`. Tests: `pixi run pytest -q`.
 - Datos: `D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv` (fuera del repo).
 
+### 0.6 Base metodológica vigente (fijada tras EXP-007, 2026-10-04)
+Todo experimento nuevo se evalúa con estas reglas; cambiarlas requiere registrar el motivo.
+- **Cooldown estándar: `until_exit`.** Con `fixed` y cooldown menor que el horizonte, las operaciones de una condición se solapan: eso es un problema de **dependencia estadística** (el t sale inflado), **no de filtración de información (leakage)**.
+- **`n_dropped_horizon` es el mecanismo de purga entre segmentos**: descarta toda señal cuyo horizonte se sale del segmento, de modo que ningún resultado de TRAIN usa precios de VALIDATION. Los tests verifican esa propiedad (`test_trade_label_window_stays_inside_segment`, `test_train_results_do_not_depend_on_future_prices`).
+- **El t entre operaciones es sólo descriptivo; nunca decide.** Decide el **t entre folds** junto con el **t HAC con 3H rezagos (`oos_hac_t_3H`)** (regla 4).
+- Corrección por varias variantes: **regla 7 y definición de K** (sección 2, "Aclaración de la regla 7 y definición de K"). Una sola corrección por familia (Reality Check *o* Bonferroni, no ambas).
+- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 1.531.500 al cierre de EXP-007.
+- Toda feature nueva: test de causalidad por truncación/perturbación del futuro y `run_lookahead.py` (EXP-006).
+
 ---
 
 ## 1. Glosario
@@ -202,6 +211,31 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
 5. **Una sola variable por experimento** cuando sea posible, para saber qué causó el cambio.
 6. **Un resultado negativo también se registra.** Descartar ideas es parte del avance.
 7. **Cuenta K de variantes** (agregada en EXP-004): toda variante de procedimiento (lado, TP/SL/H, ventana, filtro) evaluada contra la misma historia OOS suma a K. Mientras no exista el Reality Check sobre series OOS, el umbral de t entre folds se ajusta por Bonferroni (p ajustado = K × p ≤ 0,05). K actual = 4 (EXP-001 y EXP-002, LONG y SHORT).
+
+
+### Aclaración de la regla 7 y definición de K (agregada antes de EXP-008, 2026-10-04)
+
+**Qué corrige la regla 7.** Un problema concreto: el investigador (yo) prueba varias *variantes completas* del procedimiento contra la misma historia fuera de muestra y termina reportando la que mejor se ve. Aunque cada variante, por sí sola, esté medida sin filtración, la probabilidad de que *alguna* de K variantes parezca buena por azar crece con K (hasta ≈ K × p). La regla controla esa probabilidad ("al menos un falso descubrimiento" entre las K). H0 de cada variante: su retorno esperado neto fuera de muestra es ≤ 0 (o ≤ el de la línea base, en la versión "lift").
+
+**Unidad de múltiples testing que se cuenta: la variante de procedimiento.** Una variante es una configuración completa y fija de la búsqueda — conjunto de features del generador, lado (LONG y SHORT cuentan por separado), TP/SL/horizonte, filtros, diseño de folds/ventanas, escenario de costos de decisión — cuyo resultado OOS se calculó sobre la historia OOS compartida y se miró. No son variantes: cambiar de escenario de costos para reportar sensibilidad (`conservative`, `optimistic`: la decisión es con `typical`); repetir la misma variante con otra semilla de condiciones *si se reporta el agregado* (elegir la mejor semilla sí contaría).
+
+**Por qué K es la cuenta correcta (y no otra).** El sesgo de selección depende del número de resultados OOS entre los que se puede elegir. Por eso:
+| Concepto | Valor actual | ¿Entra en K? | Motivo |
+|---|---|---|---|
+| Condiciones individuales generadas | 7.500 por fold y lado | **No** | Se eligen con TRAIN y se miden en VALIDATION sin seleccionar por VALIDATION: la selección ya quedó dentro del procedimiento (EXP-003/004). |
+| Variantes / configuraciones (procedimientos completos) | 4 (EXP-001 y EXP-002 × LONG/SHORT) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
+| Experimentos | 8 (EXP-000 a EXP-007) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
+| Hipótesis acumuladas | 1.531.500 | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
+| Universo conjunto del Reality Check | las K variantes con series OOS alineables | **Define K** | K = tamaño de ese universo. |
+Pertenece al universo de una variante si: (i) mismo activo, datos y timeframe; (ii) su serie OOS puede alinearse con las demás en la historia común (se usa la intersección); (iii) el investigador podría haber reportado esa variante como "el resultado". Si alguna de las tres no está clara, **no se decide arbitrariamente**: se documenta la duda en la entrada del experimento y se informa el Reality Check con y sin esa variante. Cada variante de una ablación (quitar una feature) cuenta si se mira su resultado OOS.
+
+**Relación con White Reality Check y PBO.** El Reality Check contrasta exactamente la misma familia de K variantes teniendo en cuenta que están correlacionadas, por lo que su p-valor es menor o igual que el de Bonferroni: Bonferroni es una cota superior conservadora. La PBO responde otra pregunta (cuánto se degrada lo que se elige como mejor entre condiciones) y no entra en la cuenta de K.
+
+**Riesgo de corregir dos veces.** Existe si se aplica Bonferroni *y* el Reality Check sobre el mismo K. Regla: **una sola corrección por familia**. Cuando se puede calcular el Reality Check sobre las K variantes (series OOS alineables), se usa éste; Bonferroni sirve sólo para variantes sin serie común o como cota rápida. Además, el umbral fijo t entre folds ≥ 3 ya incluye margen: P(t > 3) vale 0,0100 con 7 g.l., 0,0075 con 9, 0,0048 con 14, 0,0018 con 89 y 0,0013 con infinitos; Bonferroni (K × p ≤ 0,05) sólo supera al umbral de 3 si K ≥ 7 con 10 folds, K ≥ 11 con 15 folds y K ≥ 29 con 90 folds. *(Corrección de EXP-004: allí se escribió "t ≥ 3 cubre hasta K ≈ 18", cifra aproximada que sólo vale para ~30 g.l.; los valores correctos dependen de los folds, como arriba.)*
+
+**Qué cambiaría si se quitara la regla.** Hoy, nada: ninguna variante se acerca al umbral (los t entre folds de EXP-001/002 están entre −2,2 y +0,1 para el retorno neto y hasta +1,3 para el lift) y para K = 4–6 el umbral Bonferroni queda por debajo de 3 en todos los diseños de folds usados (2,3–2,9). La regla es una salvaguarda para que el rigor no se erosione a medida que K crezca; no está condicionando ningún resultado actual. Se mantiene, con la forma: **umbral de decisión = máx(3, t Bonferroni(K, g.l.))**, usando `bonferroni_t_threshold` (en `multiple_testing.py`) cuando no se use el Reality Check.
+
+**K antes y después de EXP-008:** ver la entrada EXP-008.
 
 ---
 

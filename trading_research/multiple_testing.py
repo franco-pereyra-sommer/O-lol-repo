@@ -72,6 +72,56 @@ def procedure_series(z: dict[str, np.ndarray], scenario: str, benchmark: str = "
     return r
 
 
+def student_t_sf(t: float, df: float) -> float:
+    """P(T > t) para una t de Student con `df` grados de libertad (una cola)."""
+    x = df / (df + t * t)
+    p = 0.5 * _betainc(df / 2.0, 0.5, x)
+    return p if t >= 0 else 1.0 - p
+
+
+def _betainc(a: float, b: float, x: float) -> float:
+    """Beta incompleta regularizada I_x(a, b) por fracción continua (Numerical Recipes)."""
+    import math
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    ln_front = (math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
+                + a * math.log(x) + b * math.log1p(-x))
+    swap = x > (a + 1.0) / (a + b + 2.0)
+    if swap:
+        a, b, x = b, a, 1.0 - x
+    tiny = 1e-300
+    c, d = 1.0, 1.0 - (a + b) * x / (a + 1.0)
+    d = 1.0 / (d if abs(d) > tiny else tiny)
+    h = d
+    for m in range(1, 400):
+        m2 = 2 * m
+        for num in (m * (b - m) * x / ((a + m2 - 1.0) * (a + m2)),
+                    -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1.0))):
+            d = 1.0 + num * d
+            d = 1.0 / (d if abs(d) > tiny else tiny)
+            c = 1.0 + num / (c if abs(c) > tiny else tiny)
+            h *= d * c
+        if abs(d * c - 1.0) < 1e-14:
+            break
+    cf = math.exp(ln_front) * h / a
+    return 1.0 - cf if swap else cf
+
+
+def bonferroni_t_threshold(K: int, df: float, alpha: float = 0.05) -> float:
+    """t mínimo (una cola) para que K * P(T > t) <= alpha con `df` grados de libertad."""
+    target = alpha / max(K, 1)
+    lo, hi = 0.0, 50.0
+    for _ in range(80):
+        mid = (lo + hi) / 2.0
+        if student_t_sf(mid, df) > target:
+            lo = mid
+        else:
+            hi = mid
+    return hi
+
+
 def newey_west_t(x: np.ndarray, lags: int) -> float:
     """t de la media de una serie con error estándar HAC (Newey-West, pesos de Bartlett).
     `lags` debe cubrir la dependencia: para series de operaciones de hasta H velas, >= H."""

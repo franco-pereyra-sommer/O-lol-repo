@@ -3,9 +3,9 @@ import numpy as np
 import pytest
 
 from trading_research.entry_detector import Segment, fits_in_segment
-from trading_research.multiple_testing import (condition_block_stats, cscv_pbo, entry_series,
+from trading_research.multiple_testing import (bonferroni_t_threshold, condition_block_stats, cscv_pbo, entry_series,
                                                newey_west_t, procedure_series, reality_check,
-                                               stationary_bootstrap_weights)
+                                               stationary_bootstrap_weights, student_t_sf)
 
 
 def _ma_noise(rng, T, K, w):
@@ -114,3 +114,13 @@ def test_procedure_series_zero_when_no_trades_and_lift_subtracts_baseline():
          "base_typical": np.array([0.001, 0.001, 0.001])}
     assert np.allclose(procedure_series(z, "typical"), [0.0, 0.02, -0.01])
     assert np.allclose(procedure_series(z, "typical", "lift"), [0.0, 0.019, -0.011])
+
+
+def test_student_t_tail_and_bonferroni_threshold_match_known_values():
+    assert student_t_sf(3.0, 9) == pytest.approx(0.00746, abs=1e-4)     # tablas: t(0.9926; 9)
+    assert student_t_sf(2.262157, 9) == pytest.approx(0.025, abs=1e-5)
+    assert student_t_sf(1.959964, 1e7) == pytest.approx(0.025, abs=1e-5)
+    assert student_t_sf(-1.0, 20) == pytest.approx(1 - student_t_sf(1.0, 20))
+    assert bonferroni_t_threshold(1, 1e7) == pytest.approx(1.6449, abs=1e-3)
+    assert bonferroni_t_threshold(4, 1e7) == pytest.approx(2.2414, abs=2e-3)   # p = 0,0125 (una cola)
+    assert bonferroni_t_threshold(6, 89) > bonferroni_t_threshold(6, 1e7)       # colas más pesadas
