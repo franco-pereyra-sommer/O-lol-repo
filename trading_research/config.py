@@ -17,7 +17,7 @@ from typing import Any
 
 
 class PositionSide(str, Enum):
-    """Lado de la posición. SHORT queda declarado pero no implementado."""
+    """Lado de la posición."""
     LONG = "LONG"
     SHORT = "SHORT"
 
@@ -39,11 +39,27 @@ class ResearchConfig:
     # ------------------------------------------------------------------ #
     # División cronológica TRAIN → VALIDATION → TEST
     # ------------------------------------------------------------------ #
-    TRAIN_FRACTION: float = 0.60
-    VALIDATION_FRACTION: float = 0.20
-    TEST_FRACTION: float = 0.20
+    TRAIN_FRACTION: float = 0.30
+    VALIDATION_FRACTION: float = 0.35
+    TEST_FRACTION: float = 0.35
     # El TEST sólo se evalúa si se pide explícitamente (una sola vez, al final).
     RUN_TEST_EVALUATION: bool = False
+
+    # ------------------------------------------------------------------ #
+    # Walk-forward (alternativa a la división única TRAIN/VALIDATION/TEST)
+    # ------------------------------------------------------------------ #
+    # Se reserva el último WF_HOLDOUT_FRACTION como TEST final. El resto se
+    # recorre en WF_N_FOLDS folds; en cada uno se hace la búsqueda completa en
+    # su TRAIN y se evalúa en el período siguiente (su VALIDATION, fuera de
+    # muestra). Cada VALIDATION mide WF_TRAIN_VAL_RATIO veces menos que su TRAIN.
+    #   rolling (WF_ANCHORED=False): el TRAIN es una ventana de largo fijo que avanza
+    #   anchored (WF_ANCHORED=True): el TRAIN empieza siempre al principio y crece
+    # En modo walk-forward se ignoran TRAIN_FRACTION/VALIDATION_FRACTION/TEST_FRACTION.
+    WALK_FORWARD: bool = False
+    WF_N_FOLDS: int = 10
+    WF_TRAIN_VAL_RATIO: float = 3.0
+    WF_ANCHORED: bool = False
+    WF_HOLDOUT_FRACTION: float = 0.15
 
     # ------------------------------------------------------------------ #
     # Indicadores: rangos de parámetros que el generador puede explorar
@@ -57,19 +73,19 @@ class ResearchConfig:
     MACD_SLOW_RANGE: tuple[int, int] = (21, 50)
     MACD_SIGNAL_RANGE: tuple[int, int] = (5, 15)
     # Períodos n para R_n(t) = Close(t)/Close(t-n) - 1
-    RETURN_PERIODS: tuple[int, ...] = (1, 2, 3, 5, 10, 20, 50)
+    RETURN_PERIODS: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 50)
 
     # ------------------------------------------------------------------ #
     # Generación de condiciones
     # ------------------------------------------------------------------ #
     RANDOM_SEED: int = 42
-    N_SIMPLE_CONDITIONS: int = 400
-    N_COMPLEX_CONDITIONS: int = 400
+    N_SIMPLE_CONDITIONS: int = 7500
+    N_COMPLEX_CONDITIONS: int = 10000
     MAX_CONDITION_DEPTH: int = 1
     # Cuántas condiciones simples "informativas" de la etapa 1 se usan como
     # bloques para la etapa 2.
     # Con pools chicos las combinaciones de la etapa 2 se repiten mucho.
-    STAGE2_POOL_SIZE: int = 150
+    STAGE2_POOL_SIZE: int = 5000
     # Una condición simple es "informativa" si supera el filtro de cantidad de
     # casos Y mejora la línea base (todas las velas como entrada) en al menos
     # alguna de estas diferencias absolutas:
@@ -82,21 +98,21 @@ class ResearchConfig:
     THRESHOLD_SIGNIFICANT_DIGITS: int = 3
     # Probabilidades relativas de cada tipo de condición simple.
     SIMPLE_KIND_WEIGHTS: dict[str, float] = field(default_factory=lambda: {
-        "compare_const": 0.40,
-        "compare_operand": 0.30,
-        "cross_const": 0.15,
-        "cross_operand": 0.15,
+        "compare_const": 0.15,
+        "compare_operand": 0.15,
+        "cross_const": 0.40,
+        "cross_operand": 0.30,
     })
     # Probabilidades relativas de cada operador en la etapa 2.
     COMPLEX_OPERATOR_WEIGHTS: dict[str, float] = field(default_factory=lambda: {
-        "AND": 0.40,
+        "AND": 0.15,
         "OR": 0.15,
         "NOT": 0.10,
         "THEN": 0.20,
-        "WITHIN_AND": 0.15,
+        "WITHIN_AND": 0.40,
     })
     # Ventana N (velas) para "A THEN B within N" y "A occurred within N".
-    TEMPORAL_WINDOW_RANGE: tuple[int, int] = (2, 20)
+    TEMPORAL_WINDOW_RANGE: tuple[int, int] = (2, 25)
 
     # ------------------------------------------------------------------ #
     # Entradas
@@ -104,7 +120,7 @@ class ResearchConfig:
     # Cooldown entre entradas de la MISMA condición (en velas). Una señal en t
     # se acepta sólo si la última entrada aceptada de esa condición fue en una
     # vela <= t - MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES.
-    MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES: int = 10
+    MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES: int = 15
     # Regla de re-entrada para la MISMA condición:
     #   "fixed"      -> cooldown fijo de MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES
     #                   velas (las operaciones pueden superponerse si el
@@ -113,7 +129,7 @@ class ResearchConfig:
     #                   esa condición siga abierta (hasta que toque TP, SL o se
     #                   agote el horizonte). Operaciones nunca superpuestas.
     #                   En este modo el cooldown fijo se ignora.
-    COOLDOWN_MODE: str = "fixed"
+    COOLDOWN_MODE: str = "until_exit" #"fixed"
 
     # ------------------------------------------------------------------ #
     # Evaluación posterior a la entrada
@@ -200,8 +216,8 @@ class ResearchConfig:
         total = self.TRAIN_FRACTION + self.VALIDATION_FRACTION + self.TEST_FRACTION
         if abs(total - 1.0) > 1e-9:
             raise ValueError(f"TRAIN+VALIDATION+TEST debe sumar 1 (suma {total}).")
-        if self.POSITION_TYPE != PositionSide.LONG.value:
-            raise NotImplementedError("Sólo LONG está implementado en esta versión.")
+        if self.POSITION_TYPE not in (PositionSide.LONG.value, PositionSide.SHORT.value):
+            raise ValueError("POSITION_TYPE debe ser 'LONG' o 'SHORT'.")
         if self.MAX_CONDITION_DEPTH < 1:
             raise ValueError("MAX_CONDITION_DEPTH debe ser >= 1.")
         if self.AMBIGUOUS_RETURN_POLICY not in ("worst", "best", "midpoint"):
@@ -212,6 +228,10 @@ class ResearchConfig:
             raise ValueError("FILTER_MODE debe ser 'absolute', 'lift' o 'both'.")
         if self.COOLDOWN_MODE not in ("fixed", "until_exit"):
             raise ValueError("COOLDOWN_MODE debe ser 'fixed' o 'until_exit'.")
+        if self.WF_N_FOLDS < 1 or self.WF_TRAIN_VAL_RATIO <= 0:
+            raise ValueError("WF_N_FOLDS >= 1 y WF_TRAIN_VAL_RATIO > 0.")
+        if not 0 <= self.WF_HOLDOUT_FRACTION < 1:
+            raise ValueError("WF_HOLDOUT_FRACTION debe estar en [0, 1).")
         if self.MAX_HOLDING_BARS < 1:
             raise ValueError("MAX_HOLDING_BARS debe ser >= 1.")
         if not (self.TP_PERCENT > 0 and 0 < self.SL_PERCENT < 1):

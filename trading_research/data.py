@@ -56,7 +56,9 @@ def normalize_ohlc(raw: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"Faltan columnas OHLC: {missing}")
     df = df[OHLC_COLUMNS].astype("float64")
 
-    idx = pd.to_datetime(df.index, utc=True)
+    idx = df.index if isinstance(df.index, pd.DatetimeIndex) else \
+        pd.to_datetime(df.index.astype(str), utc=True, format="ISO8601")
+    idx = idx.tz_localize("UTC") if idx.tz is None else idx.tz_convert("UTC")
     df.index = idx
     df.index.name = "timestamp"
     df = df[~df.index.duplicated(keep="last")].sort_index()

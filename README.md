@@ -17,12 +17,51 @@ python -m pytest -q                                      # tests
 
 Todos los parámetros están en `trading_research/config.py` (`ResearchConfig`).
 
+## Historia larga de Binance
+
+Yahoo sólo da ~2 años de velas de 1h. Binance publica gratis toda la historia
+(BTCUSDT desde agosto de 2017). Para bajarla y guardarla como CSV:
+
+```bash
+python -m trading_research.binance_data --symbol BTCUSDT --interval 1h --out "C:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv"
+```
+
+Los .zip quedan en `binance_cache/` y no se vuelven a bajar: correrlo otra vez
+sólo agrega lo nuevo. Después se usa como cualquier CSV (`--csv ...`).
+
+## SHORT
+
+`--side SHORT` evalúa ventas en corto (TP cuando el precio baja, SL cuando
+sube, MFE/MAE y costos desde el punto de vista de la posición).
+`--side LONG SHORT` corre los dos lados en la misma grilla.
+
+## Walk-forward
+
+`--walk-forward` reemplaza la división única por varias ventanas sucesivas:
+
+```
+[ TRAIN 1      ][VAL 1]
+      [ TRAIN 2      ][VAL 2]
+            [ TRAIN 3      ][VAL 3]     ...     [ HOLDOUT ]
+```
+
+En cada fold se corre la búsqueda completa en su TRAIN y se miden las
+condiciones seleccionadas en el período siguiente. El holdout final no lo usa
+ningún fold (con `--run-test` se evalúan ahí las sobrevivientes del último
+fold). Opciones: `--wf-folds`, `--wf-ratio` (largo TRAIN / largo VAL),
+`--wf-anchored` (TRAIN crece desde el inicio) y `--wf-holdout`.
+
+Lo que hay que mirar es la consistencia entre folds (`wf_summary.csv`):
+cuántos folds tienen retorno fuera de muestra > 0 y cuántos superan a la
+línea base de su período, no sólo el promedio.
+
 ## Opciones de línea de comandos
 
 `python run_research.py --help` lista todas. Las más usadas:
 
 | Opción | Qué hace |
 |---|---|
+| `--side LONG SHORT` | Lado de la operación. Varios valores → grilla |
 | `--tp 0.05 0.08` | Take profit (fracción). Varios valores → grilla |
 | `--sl 0.02 0.03` | Stop loss (fracción). Varios valores → grilla |
 | `--horizon 30 100` | Horizonte máximo en velas. Varios valores → grilla |
@@ -31,6 +70,7 @@ Todos los parámetros están en `trading_research/config.py` (`ResearchConfig`).
 | `--min-lift-p-tp 0.03` / `--min-lift-return 0` | Umbrales del modo lift |
 | `--pool-size 150` | Piezas simples usadas para construir las condiciones complejas |
 | `--commission --slippage --spread` | Costos por lado |
+| `--walk-forward --wf-folds 5 --wf-ratio 3` | Walk-forward (ver arriba) |
 
 Con más de una combinación de TP/SL/horizonte se crea `results/grid_<fecha>/`
 con una carpeta por combinación y `grid_summary.csv` comparándolas. Datos e
@@ -61,7 +101,9 @@ Etapa 1 (simples, TRAIN) → pool → Etapa 2 (complejas, TRAIN) → filtros
 | `entry_detector.py` | entrada en `Open[t+1]`, cooldown por condición, purga de horizonte |
 | `outcome_evaluator.py` | tabla de resultados por vela de entrada |
 | `statistics.py` | métricas por condición, línea base, IC de Wilson |
-| `validation.py` | split cronológico, filtros, generador walk-forward (preparado) |
+| `validation.py` | split cronológico, filtros |
+| `walk_forward.py` | folds, búsqueda por fold, resumen fuera de muestra |
+| `binance_data.py` | descarga de historia larga desde data.binance.vision |
 | `search.py` | orquestación, guardado y recarga |
 
 ## Decisiones de arquitectura
@@ -82,8 +124,6 @@ Etapa 1 (simples, TRAIN) → pool → Etapa 2 (complejas, TRAIN) → filtros
   como `RSI > EMA`.
 - **Línea base.** Cada segmento reporta el resultado de entrar en *todas* las
   velas. Una condición sólo es interesante si mejora esa línea base.
-- **SHORT** ya está previsto en `PositionSide`; agregarlo implica invertir
-  TP/SL y High/Low en `outcome_evaluator`.
 
 ## Ambigüedades de la especificación y cómo se resolvieron
 

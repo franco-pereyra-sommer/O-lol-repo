@@ -21,6 +21,7 @@ condiciones. Todo cálculo es causal (sólo usa velas <= t).
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any
 
@@ -211,26 +212,47 @@ def operand_from_dict(d: dict[str, Any]) -> Operand:
 
 
 class FeatureStore:
-    """Caché de series calculadas sobre un DataFrame OHLC."""
+    """
+    Caché de series calculadas sobre un DataFrame OHLC.
 
-    def __init__(self, df: pd.DataFrame):
+    Ambas cachés tienen un tope de memoria (en MB). Al superarlo se descartan
+    las entradas más viejas (FIFO); si se vuelven a pedir, se recalculan. Esto
+    sólo afecta la velocidad, nunca los resultados.
+    """
+
+    def __init__(self, df: pd.DataFrame, max_feature_mb: float = 700.0,
+                 max_signal_mb: float = 300.0):
         self.df = df
         self.n = len(df)
-        self._cache: dict[str, np.ndarray] = {}
-        self._bool_cache: dict[str, np.ndarray] = {}
-        self.max_bool_cache = 4000
+        self._cache: OrderedDict[str, np.ndarray] = OrderedDict()
+        self._bool_cache: OrderedDict[str, tuple] = OrderedDict()
+        self._feature_bytes = 0
+        self._signal_bytes = 0
+        self.max_feature_bytes = int(max_feature_mb * 1e6)
+        self.max_signal_bytes = int(max_signal_mb * 1e6)
 
     def get(self, op: Operand) -> np.ndarray:
         k = op.key
-        if k not in self._cache:
-            self._cache[k] = op.compute(self.df)
-        return self._cache[k]
+        arr = self._cache.get(k)
+        if arr is None:
+            arr = op.compute(self.df)
+            self._cache[k] = arr
+            self._feature_bytes += arr.nbytes
+            while self._feature_bytes > self.max_feature_bytes and len(self._cache) > 1:
+                _, old = self._cache.popitem(last=False)
+                self._feature_bytes -= old.nbytes
+        return arr
 
-    # Caché opcional de señales booleanas por condición (clave canónica).
+    # Caché de señales booleanas por condición (clave canónica).
     def get_bool(self, key: str):
         return self._bool_cache.get(key)
 
-    def put_bool(self, key: str, arr: np.ndarray) -> None:
-        # Límite de memoria: cada entrada son 2 arrays bool de len(df).
-        if len(self._bool_cache) < self.max_bool_cache:
-            self._bool_cache[key] = arr
+    def put_bool(self, key: str, pair) -> None:
+        if key in self._bool_cache:
+            return
+        size = sum(a.nbytes for a in pair)
+        self._bool_cache[key] = pair
+        self._signal_bytes += size
+        while self._signal_bytes > self.max_signal_bytes and len(self._bool_cache) > 1:
+            _, old = self._bool_cache.popitem(last=False)
+            self._signal_bytes -= sum(a.nbytes for a in old)

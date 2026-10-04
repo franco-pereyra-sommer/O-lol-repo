@@ -203,3 +203,71 @@ def test_lift_filter():
     st2 = dict(st, lift_mean_net_return=-0.001)
     ok, why = passes_filters(st2, ResearchConfig(FILTER_MODE="lift"), seg)
     assert not ok and any("lift_mean_net" in w for w in why)
+
+
+def test_short_outcome_classification():
+    cfg = ResearchConfig(POSITION_TYPE="SHORT", MAX_HOLDING_BARS=3, TP_PERCENT=0.05,
+                         SL_PERCENT=0.02, COMMISSION_RATE=0, SLIPPAGE_RATE=0, SPREAD_RATE=0,
+                         FAVORABLE_OUTCOMES=({"type": "reach", "p": 0.03, "bars": 2},))
+    rows = [
+        [100, 101, 99, 100],     # 0: entrada SHORT -> TP en barra 2 (Low 94 <= 95)
+        [100, 101, 97, 98],      # 1
+        [98, 99, 94, 95],        # 2
+        [100, 103, 99.5, 102],   # 3: entrada -> SL inmediato (High 103 >= 102)
+        [102, 103, 101, 102],    # 4
+        [100, 103, 94, 100],     # 5: entrada -> AMBIGUOUS
+        [100, 101, 99, 99.5],    # 6: entrada -> NONE
+        [99.5, 100, 99, 99.7],
+        [99.7, 100.5, 99.2, 99.4],
+        [105, 106, 104, 105],    # 9: gap sobre el SL de la entrada en 7 (SL=101.49)
+        [105, 106, 104, 105],
+    ]
+    t = build_outcome_table(ohlc(rows), cfg)
+    assert t.outcome[0] == TP_FIRST and t.gross_return[0] == pytest.approx(0.05)
+    assert t.outcome[3] == SL_FIRST and t.gross_return[3] == pytest.approx(-0.02)
+    assert t.outcome[5] == AMBIGUOUS and t.gross_return[5] == pytest.approx(-0.02)
+    assert t.outcome[6] == NONE and t.gross_return[6] == pytest.approx(1 - 99.4 / 100)
+    assert t.outcome[7] == SL_FIRST and t.exit_price[7] == pytest.approx(105)   # llena en el gap
+    assert t.mfe[0] == pytest.approx(0.06) and t.mae[0] == pytest.approx(-0.01)
+    assert t.favorable["reach_0.03_in_2"][0] and not t.favorable["reach_0.03_in_2"][6]
+
+
+def test_short_costs_symmetric():
+    from trading_research.outcome_evaluator import apply_costs
+    cfg = ResearchConfig(COMMISSION_RATE=0.001, SLIPPAGE_RATE=0.0005, SPREAD_RATE=0.0002)
+    e, x = np.array([100.0]), np.array([100.0])
+    long_c, short_c = apply_costs(e, x, cfg, "LONG")[0], apply_costs(e, x, cfg, "SHORT")[0]
+    assert long_c < 0 and short_c < 0
+    assert long_c == pytest.approx(short_c, rel=0.01)       # mismo costo en precio plano
+    assert apply_costs(e, np.array([95.0]), cfg, "SHORT")[0] == pytest.approx(0.05 - 0.0032, abs=3e-4)
+
+
+def test_walk_forward_folds():
+    from trading_research.walk_forward import make_folds
+    for anchored in (False, True):
+        cfg = ResearchConfig(WF_N_FOLDS=4, WF_TRAIN_VAL_RATIO=3, WF_HOLDOUT_FRACTION=0.2,
+                             WF_ANCHORED=anchored, MAX_HOLDING_BARS=30)
+        folds, hold = make_folds(10000, cfg)
+        assert len(folds) == 4 and hold.start == 8000 and hold.end == 10000
+        assert folds[-1]["VALIDATION"].end == 8000
+        for i, f in enumerate(folds):
+            tr, va = f["TRAIN"], f["VALIDATION"]
+            assert tr.end == va.start and tr.start >= 0      # VAL justo después de TRAIN
+            if i:
+                assert va.start == folds[i - 1]["VALIDATION"].end   # VALs contiguas, sin solaparse
+            if anchored:
+                assert tr.start == 0
+            else:
+                assert tr.n_bars == folds[0]["TRAIN"].n_bars
+
+
+def test_cache_eviction_keeps_results():
+    df = random_walk(2000)
+    small = FeatureStore(df, max_feature_mb=0.05, max_signal_mb=0.01)
+    big = FeatureStore(df)
+    gen = ConditionGenerator(ResearchConfig(), big, slice(0, 1200), np.random.default_rng(5))
+    simple = gen.generate_simple(80)
+    conds = simple + gen.generate_complex(simple, 80, 3)
+    for c in conds:
+        assert np.array_equal(c.evaluate(small), c.evaluate(big))
+    assert small._feature_bytes <= small.max_feature_bytes + 2000 * 8

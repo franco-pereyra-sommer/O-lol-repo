@@ -58,18 +58,26 @@ class SearchResult:
 
 class ResearchPipeline:
     def __init__(self, cfg: ResearchConfig, df: pd.DataFrame | None = None,
-                 store: FeatureStore | None = None):
+                 store: FeatureStore | None = None,
+                 segments: dict[str, Segment] | None = None,
+                 table: OutcomeTable | None = None):
         """
         `store` permite reutilizar indicadores/señales ya calculados entre
         corridas sobre los MISMOS datos (p. ej. una grilla de TP/SL): las
         señales de entrada no dependen de TP, SL ni horizonte.
+        `segments` reemplaza la división 60/20/20 (lo usa el walk-forward);
+        debe tener "TRAIN" y "VALIDATION", y "TEST" si se evalúa el TEST.
+        `table` reutiliza una tabla de resultados ya calculada con la MISMA
+        configuración de operación (lado, TP, SL, horizonte, costos).
         """
         cfg.validate()
         self.cfg = cfg
         self.df = df if df is not None else load_data(cfg)
         self.store = store if store is not None and store.df is self.df else FeatureStore(self.df)
-        self.table: OutcomeTable = build_outcome_table(self.df, cfg)
-        self.segments = chronological_split(len(self.df), cfg)
+        self.table: OutcomeTable = table if table is not None else build_outcome_table(self.df, cfg)
+        self.segments = segments if segments is not None else chronological_split(len(self.df), cfg)
+        if cfg.RUN_TEST_EVALUATION and "TEST" not in self.segments:
+            raise ValueError("RUN_TEST_EVALUATION requiere un segmento TEST.")
         self.rng = np.random.default_rng(cfg.RANDOM_SEED)
         self.generator = ConditionGenerator(cfg, self.store, self.segments["TRAIN"].slice, self.rng)
         self.params = run_parameters(cfg)
@@ -134,7 +142,7 @@ class ResearchPipeline:
         t0 = time.time()
         baselines = {k: baseline_stats(s, self.table, cfg) for k, s in seg.items()}
         if not cfg.RUN_TEST_EVALUATION:
-            baselines.pop("TEST")  # ni siquiera la línea base del TEST se mira
+            baselines.pop("TEST", None)  # ni siquiera la línea base del TEST se mira
 
         # --- Etapa 1
         simple = self.generator.generate_simple(cfg.N_SIMPLE_CONDITIONS)
@@ -185,7 +193,7 @@ class ResearchPipeline:
 
         qr = quality_report(self.df, cfg.TIMEFRAME)
         meta = {
-            "created_utc": pd.Timestamp.utcnow().isoformat(),
+            "created_utc": pd.Timestamp.now(tz="UTC").isoformat(),
             "elapsed_seconds": round(time.time() - t0, 2),
             "random_seed": cfg.RANDOM_SEED,
             "data": {"n_bars": qr.n_bars, "start": str(qr.start), "end": str(qr.end),
@@ -222,9 +230,9 @@ def _json_default(o):
 
 def save_results(res: SearchResult, output_dir: str | None = None) -> Path:
     base = Path(output_dir or res.cfg.OUTPUT_DIR)
-    stamp = pd.Timestamp.utcnow().strftime("%Y%m%d_%H%M%S")
+    stamp = pd.Timestamp.now(tz="UTC").strftime("%Y%m%d_%H%M%S")
     c = res.cfg
-    out = base / (f"run_{c.ASSET}_{c.TIMEFRAME}_seed{c.RANDOM_SEED}"
+    out = base / (f"run_{c.ASSET}_{c.TIMEFRAME}_{c.POSITION_TYPE}_seed{c.RANDOM_SEED}"
                   f"_tp{c.TP_PERCENT:g}_sl{c.SL_PERCENT:g}_h{c.MAX_HOLDING_BARS}_{stamp}")
     out.mkdir(parents=True, exist_ok=True)
 

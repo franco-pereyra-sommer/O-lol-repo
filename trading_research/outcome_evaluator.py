@@ -6,7 +6,19 @@ entrada e (y de TP, SL, H, costos), no de qué condición la generó. Por eso se
 calcula una única vez una `OutcomeTable` con el resultado hipotético de entrar
 en CADA vela, y cada condición simplemente indexa esa tabla.
 
-Definiciones (LONG), con P = Open[e] y ventana k = 0..H-1 (velas e..e+H-1):
+Definiciones, con P = Open[e] y ventana k = 0..H-1 (velas e..e+H-1).
+LONG gana si el precio sube; SHORT gana si baja. Todo es simétrico:
+
+                 LONG                              SHORT
+  TP nivel       P(1+p_TP), tocado si High >= TP   P(1-p_TP), tocado si Low  <= TP
+  SL nivel       P(1-p_SL), tocado si Low  <= SL   P(1+p_SL), tocado si High >= SL
+  SL con gap     min(SL, Open)                     max(SL, Open)
+  retorno bruto  X/P - 1                           1 - X/P        (X = precio de salida)
+  MFE            max High/P - 1                    1 - min Low/P
+  MAE            min Low/P - 1                     1 - max High/P
+
+Abajo se detalla LONG; SHORT es el espejo.
+
 
   TP = P(1+p_TP)     SL = P(1-p_SL)
   k_TP = primera k con High[e+k] >= TP     k_SL = primera k con Low[e+k] <= SL
@@ -26,10 +38,15 @@ Definiciones (LONG), con P = Open[e] y ventana k = 0..H-1 (velas e..e+H-1):
   (sobre TODO el horizonte H, independientemente de si TP/SL cerraron antes:
    describen el camino del precio, no la operación).
 
-Costos (por operación completa):
-  P_ent_ef = P   (1 + slippage + spread/2)
-  P_sal_ef = P_s (1 - slippage - spread/2)
-  neto     = P_sal_ef (1 - comisión) / (P_ent_ef (1 + comisión)) - 1
+Costos (por operación completa; a = slippage + spread/2, c = comisión):
+  LONG : compra a P(1+a), vende a X(1-a)
+         neto = X(1-a)(1-c) / (P(1+a)(1+c)) - 1
+  SHORT: vende a P(1-a), recompra a X(1+a)
+         neto = [P(1-a)(1-c) - X(1+a)(1+c)] / (P(1-a))
+
+Resultados favorables generales: siempre se miden desde el punto de vista de
+la POSICIÓN. Para SHORT, "reach p" = el precio bajó p; "down_then_up" =
+primero la posición pierde p1 y después gana p2 (el precio sube y luego baja).
 """
 from __future__ import annotations
 
@@ -93,17 +110,20 @@ def _sequence(first_mask: np.ndarray, second_mask: np.ndarray) -> np.ndarray:
     return (k1 < h) & suffix_any[np.arange(len(k1)), nxt]
 
 
-def apply_costs(entry: np.ndarray, exit_: np.ndarray, cfg: ResearchConfig) -> np.ndarray:
-    adv = cfg.SLIPPAGE_RATE + cfg.SPREAD_RATE / 2.0
-    ent = entry * (1.0 + adv)
-    ex = exit_ * (1.0 - adv)
-    return ex * (1.0 - cfg.COMMISSION_RATE) / (ent * (1.0 + cfg.COMMISSION_RATE)) - 1.0
+def apply_costs(entry: np.ndarray, exit_: np.ndarray, cfg: ResearchConfig,
+                side: str | None = None) -> np.ndarray:
+    side = side or cfg.POSITION_TYPE
+    a = cfg.SLIPPAGE_RATE + cfg.SPREAD_RATE / 2.0
+    c = cfg.COMMISSION_RATE
+    if side == PositionSide.SHORT.value:
+        ent = entry * (1.0 - a)
+        return (ent * (1.0 - c) - exit_ * (1.0 + a) * (1.0 + c)) / ent
+    return exit_ * (1.0 - a) * (1.0 - c) / (entry * (1.0 + a) * (1.0 + c)) - 1.0
 
 
 def build_outcome_table(df: pd.DataFrame, cfg: ResearchConfig) -> OutcomeTable:
-    if cfg.POSITION_TYPE != PositionSide.LONG.value:
-        raise NotImplementedError("SHORT: invertir TP/SL, High/Low y el signo de los retornos.")
-
+    side = cfg.POSITION_TYPE
+    short = side == PositionSide.SHORT.value
     n, H = len(df), cfg.MAX_HOLDING_BARS
     o = df["Open"].to_numpy("float64")
     h = df["High"].to_numpy("float64")
@@ -120,20 +140,29 @@ def build_outcome_table(df: pd.DataFrame, cfg: ResearchConfig) -> OutcomeTable:
 
     Ow, Hw, Lw, Cw = (sliding_window_view(x, H)[:m] for x in (o, h, l, c))
     P = o[:m]
-    tp = P * (1 + cfg.TP_PERCENT)
-    sl = P * (1 - cfg.SL_PERCENT)
+    rows = np.arange(m)
 
-    hit_tp = Hw >= tp[:, None]
-    hit_sl = Lw <= sl[:, None]
-    k_tp, k_sl = _first_true(hit_tp), _first_true(hit_sl)
+    # "fav" = dirección que gana la posición, "adv" = la que pierde.
+    def fav_hit(p):   # máscara (m, k): el precio se movió p a favor en la vela k
+        return (Lw <= (P * (1 - p))[:, None]) if short else (Hw >= (P * (1 + p))[:, None])
+
+    def adv_hit(p):   # máscara (m, k): el precio se movió p en contra en la vela k
+        return (Hw >= (P * (1 + p))[:, None]) if short else (Lw <= (P * (1 - p))[:, None])
+
+    def ret(x):       # retorno bruto de la posición al precio x
+        return 1.0 - x / P if short else x / P - 1.0
+
+    tp = P * (1 - cfg.TP_PERCENT) if short else P * (1 + cfg.TP_PERCENT)
+    sl = P * (1 + cfg.SL_PERCENT) if short else P * (1 - cfg.SL_PERCENT)
+    k_tp, k_sl = _first_true(fav_hit(cfg.TP_PERCENT)), _first_true(adv_hit(cfg.SL_PERCENT))
 
     outcome = np.full(m, NONE, np.int8)
     outcome[k_tp < k_sl] = TP_FIRST
     outcome[k_sl < k_tp] = SL_FIRST
     outcome[(k_tp == k_sl) & (k_tp < H)] = AMBIGUOUS
 
-    rows = np.arange(m)
-    sl_fill = np.minimum(sl, Ow[rows, np.minimum(k_sl, H - 1)])
+    open_at_sl = Ow[rows, np.minimum(k_sl, H - 1)]
+    sl_fill = np.maximum(sl, open_at_sl) if short else np.minimum(sl, open_at_sl)
     exit_price = Cw[:, H - 1].copy()
     exit_off = np.full(m, H - 1, np.int16)
 
@@ -144,11 +173,11 @@ def build_outcome_table(df: pd.DataFrame, cfg: ResearchConfig) -> OutcomeTable:
     exit_off[is_sl] = k_sl[is_sl]
     exit_off[is_amb] = k_tp[is_amb]
 
-    gross = exit_price / P - 1.0
-    net = apply_costs(P, exit_price, cfg)
+    gross = ret(exit_price)
+    net = apply_costs(P, exit_price, cfg, side)
     if is_amb.any():
-        g_tp, g_sl = tp / P - 1.0, sl_fill / P - 1.0
-        n_tp, n_sl = apply_costs(P, tp, cfg), apply_costs(P, sl_fill, cfg)
+        g_tp, g_sl = ret(tp), ret(sl_fill)
+        n_tp, n_sl = apply_costs(P, tp, cfg, side), apply_costs(P, sl_fill, cfg, side)
         pol = cfg.AMBIGUOUS_RETURN_POLICY
         if pol == "worst":
             g, nn, px = g_sl, n_sl, sl_fill
@@ -164,10 +193,14 @@ def build_outcome_table(df: pd.DataFrame, cfg: ResearchConfig) -> OutcomeTable:
     tbl.exit_price[:m] = exit_price
     tbl.gross_return[:m] = gross
     tbl.net_return[:m] = net
-    tbl.mfe[:m] = Hw.max(axis=1) / P - 1.0
-    tbl.mae[:m] = Lw.min(axis=1) / P - 1.0
+    if short:
+        tbl.mfe[:m] = 1.0 - Lw.min(axis=1) / P
+        tbl.mae[:m] = 1.0 - Hw.max(axis=1) / P
+    else:
+        tbl.mfe[:m] = Hw.max(axis=1) / P - 1.0
+        tbl.mae[:m] = Lw.min(axis=1) / P - 1.0
 
-    # Resultados favorables generales (sección 20)
+    # Resultados favorables generales (sección 20), desde el punto de vista de la posición
     for spec in cfg.FAVORABLE_OUTCOMES:
         name = favorable_name(spec)
         if spec.get("bars", 0) > H:
@@ -176,19 +209,14 @@ def build_outcome_table(df: pd.DataFrame, cfg: ResearchConfig) -> OutcomeTable:
         t = spec["type"]
         arr = np.zeros(n, bool)
         if t == "reach":
-            b = spec["bars"]
-            res = (Hw[:, :b] >= (P * (1 + spec["p"]))[:, None]).any(axis=1)
+            res = fav_hit(spec["p"])[:, :spec["bars"]].any(axis=1)
         elif t == "at_horizon":
-            # retorno medido al cierre de la vela e+bars-1, es decir, exactamente
-            # `bars` velas después del instante de entrada (apertura de e).
-            b = spec["bars"]
-            res = Cw[:, b - 1] / P - 1.0 >= spec["p"]
+            # retorno al cierre de la vela e+bars-1: `bars` velas después de la entrada
+            res = ret(Cw[:, spec["bars"] - 1]) >= spec["p"]
         elif t == "down_then_up":
-            res = _sequence(Lw <= (P * (1 - spec["p1"]))[:, None],
-                            Hw >= (P * (1 + spec["p2"]))[:, None])
+            res = _sequence(adv_hit(spec["p1"]), fav_hit(spec["p2"]))
         else:  # up_then_down
-            res = _sequence(Hw >= (P * (1 + spec["p1"]))[:, None],
-                            Lw <= (P * (1 - spec["p2"]))[:, None])
+            res = _sequence(fav_hit(spec["p1"]), adv_hit(spec["p2"]))
         arr[:m] = res
         tbl.favorable[name] = arr
     return tbl
