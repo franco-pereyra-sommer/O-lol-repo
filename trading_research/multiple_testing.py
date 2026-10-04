@@ -98,9 +98,14 @@ def reality_check(perf: np.ndarray, n_boot: int = 1000, mean_block: float | None
     T, K = x.shape
     mean_block = float(mean_block) if mean_block else max(1.0, T ** (1 / 3))
     rng = np.random.default_rng(seed)
-    w = stationary_bootstrap_weights(T, n_boot, mean_block, rng)
     fbar = x.mean(axis=0)
-    boot = w @ x - fbar                       # (n_boot, K), centradas
+    # Por tandas para no materializar (n_boot, T) con T ~ 10^5.
+    chunk = max(1, int(2e7 // max(T, 1)))
+    parts = []
+    for i in range(0, n_boot, chunk):
+        w = stationary_bootstrap_weights(T, min(chunk, n_boot - i), mean_block, rng)
+        parts.append(w @ x)
+    boot = np.vstack(parts) - fbar            # (n_boot, K), centradas
     sd = boot.std(axis=0, ddof=1) if studentize else np.ones(K)
     live = sd > 1e-15
     if not live.any():

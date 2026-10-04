@@ -293,11 +293,29 @@ Estado actual: ningún procedimiento supera el paso 3; las pruebas de PBO muestr
 Decisión: sin candidato; holdout cerrado. Se mantiene el contador de hipótesis (1.531.500) y se agrega la regla K a la sección 2. Experimentos seguidos sin avance: 2 (EXP-003/004 fueron metodológicos, no cuentan).
 Próximo paso: volver a la hoja de ruta (sección 4). Lo siguiente con más valor para esta línea es `procedure_oos_series` + RC sobre las 4 variantes ya corridas, antes de agregar capacidad de búsqueda.
 
-### EXP-005 — Serie OOS del walk-forward y Reality Check sobre las 4 variantes [EN CURSO] (2026-10-04)
+### EXP-005 — Serie OOS del walk-forward y Reality Check sobre las 4 variantes (2026-10-04)
 Hipótesis (escrita antes de correr): sobre la historia OOS común de las K = 4 variantes (EXP-001 y EXP-002, LONG y SHORT), el Reality Check NO rechaza H0 "ninguna variante rinde > 0 neto" (p > 0,05) con el benchmark cero, y tampoco con el benchmark "exceso sobre la línea base". Esperado: la mejor variante es EXP-001 LONG o EXP-002 SHORT, con p ajustado claramente > 0,05.
 Especificación fijada antes de ver resultados (no se cambia después de mirar): universo = las 4 variantes; serie por vela = promedio simple de los retornos netos de las operaciones abiertas en esa vela por TODAS las condiciones seleccionadas en TRAIN (0 si ninguna; efectivo); período = intersección de las velas de VALIDATION de las 4 variantes; costos `typical` (primario) y `conservative` (sensibilidad); benchmarks: (a) cero, (b) media de la línea base del fold restada en las velas con operación; estadístico = máximo del t estudentizado; bootstrap estacionario, bloque medio 300 (= 3H) primario, 100 y 600 como sensibilidad; 1.000 remuestreos (semilla 0). Se reportan también los p-valores individuales (K = 1) y el ajuste de Bonferroni para compararlos.
 Cambio de código: el walk-forward guarda `oos_series.npz` (cnt, sum por escenario, línea base por vela, velas cubiertas) y la corrida repite EXP-001 y EXP-002 con la misma configuración y semilla (determinista: no son hipótesis nuevas; acumulado sin cambio: 1.531.500; K = 4). Test nuevo `test_walk_forward_oos_series_matches_fold_results`.
 Comandos: los de EXP-001 y EXP-002 (arriba) con `--output results/exp005/exp001` y `results/exp005/exp002`; luego `run_reality_check.py`.
+Resultado. Las repeticiones reprodujeron EXP-001/002 al dígito (retornos OOS agrupados y folds idénticos). Historia común: T = 52.240 velas contiguas de VALIDATION (≈ 5 años; T ≈ 520·H, por encima del mínimo T ≳ 200·H de EXP-004). Retorno neto medio por vela (efectivo cuando no hay operación; costos `typical`):
+
+| Variante | Operaciones OOS | Media por vela, benchmark 0 | Media por vela, exceso sobre línea base |
+|---|---|---|---|
+| EXP-001 LONG | 873.879 | −0,145 % | +0,0067 % |
+| EXP-001 SHORT | 247.116 | −0,161 % | −0,0084 % |
+| EXP-002 LONG | 765.328 | −0,109 % | +0,0094 % |
+| EXP-002 SHORT | 291.436 | −0,039 % | −0,0094 % |
+
+Reality Check (1.000 remuestreos, bootstrap estacionario, estadístico = máximo t estudentizado):
+- Benchmark 0, `typical`: p = 1,000 (bloque 300; mejor = EXP-002 SHORT); 1,000 (bloque 100); 0,999 (bloque 600). Individuales: 0,81–0,997. Con `conservative`: p = 1,000 en los tres bloques.
+- Benchmark exceso sobre la línea base, `typical`: p = 0,924 (bloque 300; mejor = EXP-002 LONG); 0,923 (100); 0,916 (600). Individuales 0,41–0,63. Con `conservative`: 0,931 / 0,932 / 0,925.
+- Bonferroni sobre el mínimo individual: 1,000 en todos los casos. Los p son insensibles al largo de bloque (100–600).
+
+Lectura: ninguna de las 4 variantes rinde > 0 neto OOS (las medias por vela son todas negativas: en el período común el procedimiento pierde costos, hasta la "mejor", EXP-002 SHORT, a −0,04 % por vela). Respecto de la línea base, los exceso de LONG son positivos pero ínfimos (< 0,01 % por vela) y con p individual ≈ 0,4: no se distinguen de 0, y SHORT queda por debajo. El RC con K = 4 no cambia la conclusión porque ni siquiera el mejor p individual está cerca de 0,05; la corrección por múltiples variantes no es lo que decide acá, lo decide la ausencia de efecto. Esto es consistente con el t entre folds de EXP-003 (|t| ≤ 2,2, ninguno a favor) y con la PBO de EXP-004. Con costos `typical`, el exceso LONG sobre la base (≈ +0,007–0,009 % por vela) es ~100 veces menor que el costo por operación: aunque fuera real no sería operable.
+Notas de validez: (1) la media "por operación" y las medias por vela dependen de la definición de serie (promedio simple entre condiciones, 0 si no hay operación); otras ponderaciones cambian el nivel, no el signo; no se exploraron (especificación fijada antes). (2) El RC aquí tiene K = 4 porque el universo son procedimientos, no condiciones: no sustituye una corrección sobre las 7.500 condiciones por fold, que no hace falta mientras el OOS no se use para elegir. (3) Límite conocido: RC estudentizado sin recentrado SPA es algo conservador; no cambia nada con p ≥ 0,4.
+Decisión: sin candidato; K sigue en 4 (no se agregaron variantes); acumulado de hipótesis 1.531.500 (las repeticiones son deterministas). Infraestructura lista y probada: `oos_series.npz` por walk-forward, `run_reality_check.py` y la serie. Holdout cerrado. Experimentos seguidos sin avance de búsqueda: 2 (EXP-001/002; los metodológicos 003–005 no cuentan).
+Próximo paso: segunda prueba de look-ahead a nivel de señales (ítem 2 del plan), antes de agregar capacidad de búsqueda. De ahora en adelante cada variante nueva se compara contra estas cuatro con el mismo RC (K crece) y debería guardar `oos_series.npz` (ya lo hace por defecto).
 
 ---
 
@@ -306,7 +324,7 @@ Comandos: los de EXP-001 y EXP-002 (arriba) con `--output results/exp005/exp001`
 Orden revisado a pedido del usuario (2026-10-04): primero validez estadística del proceso (EXP-003 y EXP-004, hechos), después el resto. La numeración siguiente es provisoria y se puede cambiar según resultados, registrando el motivo. Cada ítem es un experimento separado.
 
 Siguiente (alta prioridad, completa la línea de validez):
-1. **`procedure_oos_series` + Reality Check** sobre las 4 variantes de EXP-001/002 (requiere guardar las operaciones OOS por fold). SPA como extensión.
+1. ~~`procedure_oos_series` + Reality Check sobre las 4 variantes~~ (hecho en EXP-005; SPA queda como extensión).
 2. **Segunda prueba de look-ahead a nivel de señales** (inspirada en Freqtrade): recalcular la señal con datos truncados/ampliados y comparar las entradas, no sólo los indicadores.
 3. **Revisión del tratamiento estadístico de operaciones superpuestas** (cooldown `fixed` vs `until_exit`; t por entradas vs por folds vs HAC).
 
