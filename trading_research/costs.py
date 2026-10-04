@@ -112,13 +112,15 @@ class VolatilitySlippage(SlippageModel):
     base: float
     k: float
     period: int = 14
+    # ATR/Close que se asume mientras el ATR no está definido (primeras `period`+1 velas de los
+    # datos). Es una constante fija a propósito: usar la mediana de la muestra (como se hacía
+    # antes, EXP-006) mira el futuro. 1 % es holgadamente conservador para BTC en 1h (mediana ~0,4 %).
+    warmup_atr_pct: float = 0.01
 
     def slippage(self, bar_idx, ctx, notional=None):
         atr_pct = ctx.atr_pct_prev(self.period)
         v = atr_pct[np.clip(bar_idx, 0, len(atr_pct) - 1)]
-        finite = atr_pct[np.isfinite(atr_pct)]
-        fill = float(np.median(finite)) if len(finite) else 0.0
-        v = np.where(np.isfinite(v), v, fill)
+        v = np.where(np.isfinite(v), v, self.warmup_atr_pct)
         return self.base + self.k * v
 
 
