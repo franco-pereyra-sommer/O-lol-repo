@@ -15,12 +15,12 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 ## 0. Estado actual y guía de lectura
 
-*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-04, tras cerrar EXP-007. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
+*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-05, tras cerrar EXP-008. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
 
 ### 0.1 En pocas palabras
 - **Qué se busca:** reglas de entrada (por ejemplo "RSI cruza tal valor y la media corta supera a la larga") que den ganancia **después de costos**, en datos que la regla **no vio** al elegirse, y de forma repetible en distintos períodos del mercado.
 - **Dónde estamos:** con BTCUSDT 1h (2017-2026) **ninguna variante probada gana dinero fuera de muestra** (EXP-001, 002, 005). No hay "candidato" y el tramo final de datos reservado (holdout) **sigue sin abrirse**.
-- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007 (todas terminadas). Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
+- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007 (todas terminadas); EXP-008 usó esa infraestructura para probar la primera idea de búsqueda nueva. Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
 
 ### 0.2 Experimentos: estado y conclusión (una línea cada uno)
 | Experimento | Qué fue | Estado | Conclusión |
@@ -33,6 +33,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 | EXP-005 | Reality Check sobre las 4 variantes ya corridas | Cerrado | p ≈ 0,9–1,0: ninguna es distinguible de cero ni de la línea base. |
 | EXP-006 | Segunda prueba de look-ahead (que ninguna señal use datos futuros) | Cerrado | 0 fugas en 5.000 condiciones. Un look-ahead leve en el costo del escenario `conservative` fue corregido. |
 | EXP-007 | Operaciones superpuestas: qué estadístico es válido y qué cooldown conviene | Cerrado | El t entre operaciones es inútil (bajo ruido "pasa" t ≥ 3 el 24 % de las veces); valen el t entre folds y el HAC. Cooldown estándar: `until_exit`. |
+| EXP-008 | Features de régimen (tendencia 4h, tendencia diaria, volatilidad relativa) vs baseline, misma metodología | Cerrado | **No mejoran la generalización fuera de muestra** (t pareado +1,29 LONG, −1,14 SHORT; Reality Check p ≥ 0,79). Sólo inflan lo "mejor in-sample" (PBO). Resultado negativo registrado. |
 
 ### 0.3 Respuestas a las preguntas de revisión
 
@@ -51,14 +52,14 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 **3. Estado del roadmap.**
 - EXP-001/002 están **cerrados y reproducidos** (se repitieron en EXP-005 y dieron los mismos números al dígito).
-- Terminados: EXP-000 a EXP-007 (ver 0.2). En curso: ninguno.
-- **Pendiente de la tabla original** (sección 4, Plan): features de régimen (tendencia en 4h/diario, volatilidad); condiciones "contexto + disparador"; TP/SL proporcionales al ATR; volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
-- La numeración vieja (EXP-003 = régimen, EXP-004 = contexto+disparador) **ya fue reemplazada** en la sección 4.
+- Terminados: EXP-000 a EXP-008 (ver 0.2). En curso: ninguno.
+- **Pendiente de la tabla original** (sección 4, Plan): condiciones "contexto + disparador"; TP/SL proporcionales al ATR; volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
+- La numeración vieja (EXP-003 = régimen, EXP-004 = contexto+disparador) **ya fue reemplazada** en la sección 4. Las features de régimen (la "EXP-003 original") ya se probaron en EXP-008: no mejoraron.
 
 **4. Próximo experimento (propuesta, la decisión es tuya).**
 1. ~~Cerrar EXP-007~~ (hecho: cooldown `until_exit`; deciden el t entre folds y el HAC, nunca el t entre operaciones).
-2. Volver a lo experimental. Lo más coherente con el plan es **features de régimen** (tendencia en temporalidades mayores y volatilidad relativa), porque son el requisito de "contexto + disparador". Tras agregarlas hay que correr `run_lookahead.py` (regla de EXP-006) y comparar contra las 4 variantes con el Reality Check (K sube a 5, 6…).
-3. Alternativa si prefieres más validez antes de más capacidad: CPCV o PBO sobre el lift.
+2. ~~Features de régimen~~ (hecho en EXP-008: no mejoran la generalización; quedan implementadas y apagadas por defecto).
+3. **Lo que sigue lo decidís vos.** Opciones (detalle en el final de EXP-008): (a) condiciones estructuradas "contexto + disparador" usando esos operandos de régimen como contexto; (b) cambiar la relación costo/ganancia (TP/SL más grandes o proporcionales al ATR, horizontes más largos: menos operaciones, más recorrido por operación frente a un costo casi fijo); (c) más validez (CPCV, PBO sobre el lift). Con 3 experimentos de búsqueda seguidos sin avance y una causa probable identificada (el costo de ~0,25 % por operación domina frente a condiciones simples sin información), conviene elegir con criterio y no por inercia.
 - *Decisiones tomadas por Claude que conviene que conozcas y puedas revertir:* (a) se enmendó el criterio de candidato a "t entre folds ≥ 3" (EXP-003); (b) se fijó en 1 % el ATR supuesto en las primeras velas del modelo de slippage (EXP-006); (c) se agregó la regla 7 (Bonferroni con la cuenta K).
 
 ### 0.4 Mini-glosario sin jerga (el glosario técnico está en la sección 1)
@@ -82,7 +83,7 @@ Todo experimento nuevo se evalúa con estas reglas; cambiarlas requiere registra
 - **`n_dropped_horizon` es el mecanismo de purga entre segmentos**: descarta toda señal cuyo horizonte se sale del segmento, de modo que ningún resultado de TRAIN usa precios de VALIDATION. Los tests verifican esa propiedad (`test_trade_label_window_stays_inside_segment`, `test_train_results_do_not_depend_on_future_prices`).
 - **El t entre operaciones es sólo descriptivo; nunca decide.** Decide el **t entre folds** junto con el **t HAC con 3H rezagos (`oos_hac_t_3H`)** (regla 4).
 - Corrección por varias variantes: **regla 7 y definición de K** (sección 2, "Aclaración de la regla 7 y definición de K"). Una sola corrección por familia (Reality Check *o* Bonferroni, no ambas).
-- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 1.531.500 al cierre de EXP-007.
+- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 2.911.500 al cierre de EXP-008. K (variantes en el Reality Check) = 6.
 - Toda feature nueva: test de causalidad por truncación/perturbación del futuro y `run_lookahead.py` (EXP-006).
 
 ---
@@ -223,9 +224,9 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
 | Concepto | Valor actual | ¿Entra en K? | Motivo |
 |---|---|---|---|
 | Condiciones individuales generadas | 7.500 por fold y lado | **No** | Se eligen con TRAIN y se miden en VALIDATION sin seleccionar por VALIDATION: la selección ya quedó dentro del procedimiento (EXP-003/004). |
-| Variantes / configuraciones (procedimientos completos) | 4 (EXP-001 y EXP-002 × LONG/SHORT) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
-| Experimentos | 8 (EXP-000 a EXP-007) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
-| Hipótesis acumuladas | 1.531.500 | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
+| Variantes / configuraciones (procedimientos completos) | 6 al cierre de EXP-008 (EXP-001, EXP-002 y regime-aware EXP-008, cada uno LONG/SHORT; eran 4 antes de EXP-008) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
+| Experimentos | 9 (EXP-000 a EXP-008) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
+| Hipótesis acumuladas | 2.911.500 (al cierre de EXP-008) | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
 | Universo conjunto del Reality Check | las K variantes con series OOS alineables | **Define K** | K = tamaño de ese universo. |
 Pertenece al universo de una variante si: (i) mismo activo, datos y timeframe; (ii) su serie OOS puede alinearse con las demás en la historia común (se usa la intersección); (iii) el investigador podría haber reportado esa variante como "el resultado". Si alguna de las tres no está clara, **no se decide arbitrariamente**: se documenta la duda en la entrada del experimento y se informa el Reality Check con y sin esa variante. Cada variante de una ablación (quitar una feature) cuenta si se mira su resultado OOS.
 
@@ -475,7 +476,7 @@ Decisión (estándar de medición desde acá):
 Cambios de código: `newey_west_t` y `procedure_series` en `multiple_testing.py`, `oos_hac_t_3H` en `walk_forward.py`, advertencia en `config.py`, `run_overlap_study.py`; tests `test_newey_west_t_matches_iid_t_without_lags_and_corrects_dependent_series`, `test_procedure_series_zero_when_no_trades_and_lift_subtracts_baseline`, `test_fixed_cooldown_shorter_than_horizon_warns` (47 pasan). No suma al contador de hipótesis (1.531.500) ni a K (4).
 Próximo paso: con la medición estandarizada, volver a la parte experimental. Propuesta: features de régimen (tendencia en 4h/diario y volatilidad relativa), seguidas de `run_lookahead.py` y comparación con las 4 variantes por Reality Check.
 
-### EXP-008 — Features de régimen: ¿mejoran la generalización OOS o sólo suman ganadores aparentes? [EN CURSO] (2026-10-04)
+### EXP-008 — Features de régimen: ¿mejoran la generalización OOS o sólo suman ganadores aparentes? (2026-10-04/05)
 **Pregunta.** ¿Agregar información de régimen/contexto mejora la capacidad del procedimiento de encontrar condiciones que generalicen fuera de muestra, sin que la mejora se explique por haber probado más hipótesis? Si la respuesta es negativa, es un resultado válido.
 **Variable experimental (una sola, aislada).** Tres familias de operandos nuevas, todas juntas como UNA variante (sin ablación hasta cerrar el experimento): tendencia 4h (`HTFTrend("4h", n)`, n ∈ [6, 60]), tendencia diaria (`HTFTrend("1D", n)`, n ∈ [5, 100]) y volatilidad relativa (`RelativeVolatility(corto, largo)` = ATR(corto)/ATR(largo), corto ∈ [5, 30], largo ∈ [60, 300]). No se agrega volumen, hora del día, día de la semana, TP/SL por ATR ni patrones de velas nuevos.
 **Causalidad.** `HTFTrend` = cierre de la última vela superior COMPLETA / media de sus últimos n cierres − 1. La vela superior que contiene a la vela i sólo se considera completa al cierre de i si ts_i + base cae exactamente en el borde de la vela superior (4h: 00, 04, 08…; 1D: 00:00 UTC); si no, se usa la anterior. Nunca se usa una vela superior abierta ni posteriores a i. La alineación usa la época UTC (la zona horaria del índice no influye; sin zona = UTC). Tests (`tests/test_regime.py`): invariancia por truncación y por perturbación del futuro (cortes a cualquier hora del día), inicio no alineado, huecos de datos, zonas horarias, valores conocidos hora por hora, un "canario" que mira la vela abierta (se detecta) y que con el flag apagado el generador produce exactamente las mismas condiciones que antes (misma semilla). Además: `run_lookahead.py --regime-features`.
@@ -492,6 +493,49 @@ Hallazgo durante los tests: con pandas 3 el índice de fechas puede venir en mic
 Hipótesis (antes de correr B): R1 y R2 no se cumplen; el t pareado queda dentro de ±2; B no tiene más retorno OOS que A. Hipótesis probadas: B = 7.500 × 90 folds × 2 lados = 1.350.000, más la PBO de B (7.500 × 2 lados × 2 semillas = 30.000): acumulado 1.531.500 → 2.911.500.
 Comandos: `pixi run python run_research.py --csv "D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv" --walk-forward --wf-train-bars 2500 --wf-val-bars 720 --side LONG SHORT --tp 0.05 --sl 0.03 --horizon 100 --cooldown-mode until_exit --filter-mode both --cost-scenario typical --no-events --regime-features --output results/exp008/regime`; `run_lookahead.py --regime-features`; `run_pbo.py --regime-features --seed {42,7}`; análisis pareado `run_regime_comparison.py`.
 
+**Resultados (2026-10-05).** Look-ahead con las features nuevas (`run_lookahead.py --regime-features`, 5.000 condiciones, 2.631 operandos, 15 cortes): **0/2.631** operandos, **0/5.000** señales y **0/600** chequeos de entradas con diferencias. (Informativo: 326/2.631 operandos dependen del punto de arranque de la historia; son los de ventana larga —ATR largo hasta 300 velas, medias de hasta 100 velas diarias— que necesitan más de 2.000 horas para converger. En el walk-forward los TRAIN arrancan con años de calentamiento; un uso en vivo debe arrancar con ≥ 100 días de historia.)
+
+Walk-forward, 90 folds, costos `typical` salvo donde se indica. A = baseline (EXP-002, reproducido en EXP-005), B = regime-aware (mismo comando con `--regime-features`):
+
+| | A LONG | B LONG | A SHORT | B SHORT |
+|---|---|---|---|---|
+| Retorno neto OOS agrupado (todas las entradas) | −0,191 % | −0,219 % | −0,146 % | −0,136 % |
+| Ídem `conservative` | −0,344 % | −0,376 % | −0,296 % | −0,287 % |
+| Media por fold del neto OOS | −0,154 % | −0,060 % | −0,184 % | −0,255 % |
+| Media por fold del lift sobre la línea base | +0,053 % | +0,107 % | −0,020 % | −0,029 % |
+| t entre folds, neto | −1,56 | −0,55 | −1,89 | **−2,59** |
+| t entre folds, lift | +1,13 | +1,84 | −0,43 | −0,64 |
+| `oos_hac_t_3H`, neto (lift) | −1,99 (+0,04) | −1,96 (+0,13) | −0,89 (−0,12) | −1,03 (−0,14) |
+| Folds con neto > 0 (de los que operaron) | 39/89 | 37/89 | 37/74 | 33/78 |
+| Folds que superan la línea base | 52 | 55 | 31 | 34 |
+| Folds con neto > 0 en `conservative` | 32 | 32 | 31 | 32 |
+| Operaciones OOS | 895.090 | 722.946 | 492.594 | 394.254 |
+| Condiciones seleccionadas en TRAIN (suma de folds) | 70.595 | 56.795 | 44.549 | 35.992 |
+| Pasan también el filtro en VALIDATION | 83 | 82 | 58 | 47 |
+| Fracción media de seleccionadas con neto OOS > 0 | 42,2 % | 42,0 % | 46,1 % | 42,4 % |
+
+**R1 (mejora relativa B − A, mismos folds):** LONG: diferencia media por fold +0,020 %, t pareado **1,29** (n = 88), HAC de la diferencia 0,30, bootstrap p(B > A) = 0,36 → **NO**. SHORT: −0,017 %, t pareado **−1,14** (n = 74), HAC −1,34, p = 0,92 → **NO**.
+**R2 (candidato absoluto):** ningún lado: t entre folds de neto −0,55 (LONG) y −2,59 (SHORT); neto OOS negativo también en `conservative`; HAC < 2 → **NO**.
+**Reality Check** (bloque 300, 1.000 remuestreos), universo K = 6 (EXP-001 L/S + A L/S + B L/S), T = 52.240 velas: benchmark cero, `typical`: p = 1,000 (mejor A SHORT; B LONG individual 0,97, B SHORT 0,83); exceso sobre la línea base, `typical`: p = 0,914 (mejor B LONG, p individual 0,38); `conservative`: 1,000 / 0,925. Sensibilidad K = 4 (sólo EXP-002 A y B, T = 64.800): 0,995 / 0,793 / 1,000 / 0,811. Sin diferencias de conclusión entre K = 4 y K = 6.
+**PBO del proceso de selección** (`run_pbo.py`, 7.500 condiciones, 16 bloques; semillas 42 / 7):
+
+| | PBO | Mejor IN | Esa misma OUT | % condiciones con media > 0 en todo el desarrollo |
+|---|---|---|---|---|
+| A LONG | 0,72 / 0,49 | +0,87 % / +0,97 % | −0,30 % / −0,09 % | 13 % / 13 % |
+| B LONG | 0,60 / 0,24 | +1,45 % / +1,46 % | −0,24 % / +0,13 % | 15 % / 15 % |
+| A SHORT | 0,24 / 0,28 | +0,94 % / +0,94 % | +0,10 % / −0,05 % | 0,5 % / 0,6 % |
+| B SHORT | 0,34 / 0,23 | +1,21 % / +1,22 % | −0,11 % / −0,07 % | 2,8 % / 3,1 % |
+
+**Lectura.**
+- *¿Mejora la generalización OOS?* **No.** Ninguna regla de decisión se cumple. LONG tiene un lift de fold algo mayor (+0,107 % vs +0,053 %), pero el t pareado (1,29) y el HAC de la diferencia (0,30) no lo distinguen de cero, y el retorno agrupado es un poco peor (−0,219 % vs −0,191 %). En SHORT, B es peor en la media por fold (t entre folds de −2,59: pierde de forma significativa; es el t más negativo de la serie, EXP-001 SHORT había dado −2,15). El Reality Check no encuentra nada (p ≥ 0,79).
+- *¿Más "ganadores aparentes"?* **En la selección in-sample sí; en la selección que realmente se mide fuera de muestra, no.** La PBO muestra que la mejor condición IN-sample es sistemáticamente más alta con régimen (≈ +1,2 a +1,5 % por operación vs +0,9 a +1,0 %) y que la fracción de condiciones "positivas" en todo el desarrollo sube (SHORT: de 0,5 % a ~3 %), pero la misma condición vuelve a ≈ 0 o negativo OUT: el hueco IN − OUT crece (promedio de las 4 combinaciones ≈ 1,0 pp en A → 1,4 pp en B), señal clásica de que el espacio más grande produce mejores aparentes y no mejores reales. En el walk-forward, en cambio, B no tiene más sobrevivientes (82 vs 83 y 47 vs 58 pasan VALIDATION; 20 % menos condiciones seleccionadas y 20 % menos operaciones OOS), de modo que el filtro de TRAIN no se infla. La PBO es muy variable con la semilla (B LONG 0,60 vs 0,24; el OUT del mejor, −0,24 % vs +0,13 %): no se saca ninguna conclusión de una sola semilla.
+- Respuesta a la pregunta del experimento: **agregar tendencia 4h, tendencia diaria y volatilidad relativa no mejora la generalización OOS** del procedimiento actual; lo único que aumenta es el sesgo de selección in-sample. Resultado negativo, válido y registrado.
+- Predicción previa (R1 y R2 no se cumplen, |t pareado| < 2, B no mejor): se cumplió.
+
+**Cuentas.** Hipótesis de este experimento: 1.350.000 (walk-forward B: 7.500 × 90 folds × 2 lados) + 30.000 (PBO B: 7.500 × 2 lados × 2 semillas) = 1.380.000; **acumulado 2.911.500**. **K = 6** desde este experimento (B LONG y B SHORT se suman al universo por las tres condiciones de pertenencia declaradas arriba; no hubo ablaciones: las tres familias de features se probaron juntas, como una sola variante por lado).
+**Decisión.** (1) Las features de régimen quedan implementadas y probadas pero **apagadas por defecto** (`REGIME_FEATURES=False`); no se usan en los experimentos siguientes salvo como componente de una estructura distinta. (2) No se hace control de placebo ni ablación: R1 no se cumplió, así que no hay mejora que explicar. (3) Holdout cerrado; sin candidato. Experimentos de búsqueda seguidos sin avance: 3 (EXP-001, 002, 008; los metodológicos no cuentan); el umbral para revisar el rumbo es 10, pero la señal es consistente: **el costo (≈ 0,25 % por operación) y la falta de información en condiciones simples sorteadas aleatoriamente** dominan, no la falta de features.
+**Próximo paso (a decidir con el usuario).** Opciones: (a) condiciones estructuradas "contexto + disparador" (idea B): los tres operandos de régimen como contexto y un disparador rápido, con muchas menos combinaciones que la búsqueda aleatoria; (b) cambiar la relación costo/ganancia (TP/SL más grandes o proporcionales al ATR, horizontes más largos: menos operaciones y más recorrido por operación frente a un costo fijo); (c) validez adicional (CPCV, PBO sobre el lift). No se avanza con ATR, volumen ni otras features hasta que se decida.
+
 ---
 
 ## 4. Plan
@@ -504,7 +548,7 @@ Siguiente (alta prioridad, completa la línea de validez):
 3. ~~Revisión del tratamiento estadístico de operaciones superpuestas~~ (hecho en EXP-007).
 
 Hoja de ruta original, conservada:
-4. Features de régimen: tendencia en temporalidades mayores (4h, diario) y volatilidad relativa (era EXP-003).
+4. ~~Features de régimen: tendencia en temporalidades mayores (4h, diario) y volatilidad relativa~~ (hecho en EXP-008: sin mejora OOS).
 5. Condiciones con lógica "contexto + disparador" y búsqueda por estados/eventos (idea B).
 6. TP/SL proporcionales al ATR.
 7. Volumen y hora del día / día de la semana; otras features.
