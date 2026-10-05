@@ -15,12 +15,12 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 ## 0. Estado actual y guía de lectura
 
-*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-05, tras cerrar EXP-008. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
+*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-05, tras cerrar EXP-009. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
 
 ### 0.1 En pocas palabras
 - **Qué se busca:** reglas de entrada (por ejemplo "RSI cruza tal valor y la media corta supera a la larga") que den ganancia **después de costos**, en datos que la regla **no vio** al elegirse, y de forma repetible en distintos períodos del mercado.
 - **Dónde estamos:** con BTCUSDT 1h (2017-2026) **ninguna variante probada gana dinero fuera de muestra** (EXP-001, 002, 005). No hay "candidato" y el tramo final de datos reservado (holdout) **sigue sin abrirse**.
-- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007 (todas terminadas); EXP-008 usó esa infraestructura para probar la primera idea de búsqueda nueva. Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
+- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007 (todas terminadas); EXP-008 y EXP-009 usaron esa infraestructura para probar las dos primeras ideas de búsqueda nuevas (más información de contexto; búsqueda estructurada), ambas sin mejora. Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
 
 ### 0.2 Experimentos: estado y conclusión (una línea cada uno)
 | Experimento | Qué fue | Estado | Conclusión |
@@ -34,6 +34,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 | EXP-006 | Segunda prueba de look-ahead (que ninguna señal use datos futuros) | Cerrado | 0 fugas en 5.000 condiciones. Un look-ahead leve en el costo del escenario `conservative` fue corregido. |
 | EXP-007 | Operaciones superpuestas: qué estadístico es válido y qué cooldown conviene | Cerrado | El t entre operaciones es inútil (bajo ruido "pasa" t ≥ 3 el 24 % de las veces); valen el t entre folds y el HAC. Cooldown estándar: `until_exit`. |
 | EXP-008 | Features de régimen (tendencia 4h, tendencia diaria, volatilidad relativa) vs baseline, misma metodología | Cerrado | **No mejoran la generalización fuera de muestra** (t pareado +1,29 LONG, −1,14 SHORT; Reality Check p ≥ 0,79). Sólo inflan lo "mejor in-sample" (PBO). Resultado negativo registrado. |
+| EXP-009 | Búsqueda estructurada "contexto + disparador" vs búsqueda aleatoria (mismo presupuesto de 7.500 condiciones por fold) | Cerrado | **No es mejor**: t pareado +0,93 (LONG) y +0,30 (SHORT) contra la aleatoria con las mismas features; Reality Check p ≥ 0,87. Opera entre 9 y 16 veces menos, pero el lift por fold no cambia; ningún procedimiento es rentable. |
 
 ### 0.3 Respuestas a las preguntas de revisión
 
@@ -52,14 +53,15 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 **3. Estado del roadmap.**
 - EXP-001/002 están **cerrados y reproducidos** (se repitieron en EXP-005 y dieron los mismos números al dígito).
-- Terminados: EXP-000 a EXP-008 (ver 0.2). En curso: ninguno.
-- **Pendiente de la tabla original** (sección 4, Plan): condiciones "contexto + disparador"; TP/SL proporcionales al ATR; volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
-- La numeración vieja (EXP-003 = régimen, EXP-004 = contexto+disparador) **ya fue reemplazada** en la sección 4. Las features de régimen (la "EXP-003 original") ya se probaron en EXP-008: no mejoraron.
+- Terminados: EXP-000 a EXP-009 (ver 0.2). En curso: ninguno.
+- **Pendiente de la tabla original** (sección 4, Plan): TP/SL proporcionales al ATR; volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
+- La numeración vieja (EXP-003 = régimen, EXP-004 = contexto+disparador) **ya fue reemplazada** en la sección 4. Las features de régimen (la "EXP-003 original") se probaron en EXP-008 y la estructura "contexto + disparador" (la "EXP-004 original") en EXP-009: ninguna mejoró.
 
 **4. Próximo experimento (propuesta, la decisión es tuya).**
 1. ~~Cerrar EXP-007~~ (hecho: cooldown `until_exit`; deciden el t entre folds y el HAC, nunca el t entre operaciones).
 2. ~~Features de régimen~~ (hecho en EXP-008: no mejoran la generalización; quedan implementadas y apagadas por defecto).
-3. **Lo que sigue lo decidís vos.** Opciones (detalle en el final de EXP-008): (a) condiciones estructuradas "contexto + disparador" usando esos operandos de régimen como contexto; (b) cambiar la relación costo/ganancia (TP/SL más grandes o proporcionales al ATR, horizontes más largos: menos operaciones, más recorrido por operación frente a un costo casi fijo); (c) más validez (CPCV, PBO sobre el lift). Con 3 experimentos de búsqueda seguidos sin avance y una causa probable identificada (el costo de ~0,25 % por operación domina frente a condiciones simples sin información), conviene elegir con criterio y no por inercia.
+3. ~~Contexto + disparador~~ (hecho en EXP-009: no mejora; el generador queda implementado y apagado por defecto).
+4. **Lo que sigue lo decidís vos.** Hay 4 experimentos de búsqueda seguidos sin avance (EXP-001, 002, 008, 009; CLAUDE.md pide revisar el rumbo a los 10). Lo único que ninguno cambió es la relación entre el costo (≈ 0,25 % por operación) y el recorrido por operación (TP 5 % / SL 3 % / horizonte 100 velas sobre BTC 1h). Opciones: (a) mover esa relación: TP/SL mayores o proporcionales al ATR, horizontes más largos, temporalidades más lentas; (b) ampliar a otros activos (más historia independiente); (c) más validez estadística (CPCV, PBO sobre el lift); (d) frenar la búsqueda de reglas de entrada y revisar el objetivo del proyecto. Cada una es un experimento separado y suma variantes (K).
 - *Decisiones tomadas por Claude que conviene que conozcas y puedas revertir:* (a) se enmendó el criterio de candidato a "t entre folds ≥ 3" (EXP-003); (b) se fijó en 1 % el ATR supuesto en las primeras velas del modelo de slippage (EXP-006); (c) se agregó la regla 7 (Bonferroni con la cuenta K).
 
 ### 0.4 Mini-glosario sin jerga (el glosario técnico está en la sección 1)
@@ -83,7 +85,7 @@ Todo experimento nuevo se evalúa con estas reglas; cambiarlas requiere registra
 - **`n_dropped_horizon` es el mecanismo de purga entre segmentos**: descarta toda señal cuyo horizonte se sale del segmento, de modo que ningún resultado de TRAIN usa precios de VALIDATION. Los tests verifican esa propiedad (`test_trade_label_window_stays_inside_segment`, `test_train_results_do_not_depend_on_future_prices`).
 - **El t entre operaciones es sólo descriptivo; nunca decide.** Decide el **t entre folds** junto con el **t HAC con 3H rezagos (`oos_hac_t_3H`)** (regla 4).
 - Corrección por varias variantes: **regla 7 y definición de K** (sección 2, "Aclaración de la regla 7 y definición de K"). Una sola corrección por familia (Reality Check *o* Bonferroni, no ambas).
-- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 2.911.500 al cierre de EXP-008. K (variantes en el Reality Check) = 6.
+- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 4.291.500 al cierre de EXP-009. K (variantes en el Reality Check) = 8.
 - Toda feature nueva: test de causalidad por truncación/perturbación del futuro y `run_lookahead.py` (EXP-006).
 
 ---
@@ -224,9 +226,9 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
 | Concepto | Valor actual | ¿Entra en K? | Motivo |
 |---|---|---|---|
 | Condiciones individuales generadas | 7.500 por fold y lado | **No** | Se eligen con TRAIN y se miden en VALIDATION sin seleccionar por VALIDATION: la selección ya quedó dentro del procedimiento (EXP-003/004). |
-| Variantes / configuraciones (procedimientos completos) | 6 al cierre de EXP-008 (EXP-001, EXP-002 y regime-aware EXP-008, cada uno LONG/SHORT; eran 4 antes de EXP-008) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
-| Experimentos | 9 (EXP-000 a EXP-008) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
-| Hipótesis acumuladas | 2.911.500 (al cierre de EXP-008) | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
+| Variantes / configuraciones (procedimientos completos) | 8 al cierre de EXP-009 (EXP-001, EXP-002, EXP-008-régimen y EXP-009-estructurada, cada uno LONG/SHORT; eran 4 antes de EXP-008 y 6 antes de EXP-009) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
+| Experimentos | 10 (EXP-000 a EXP-009) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
+| Hipótesis acumuladas | 4.291.500 (al cierre de EXP-009) | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
 | Universo conjunto del Reality Check | las K variantes con series OOS alineables | **Define K** | K = tamaño de ese universo. |
 Pertenece al universo de una variante si: (i) mismo activo, datos y timeframe; (ii) su serie OOS puede alinearse con las demás en la historia común (se usa la intersección); (iii) el investigador podría haber reportado esa variante como "el resultado". Si alguna de las tres no está clara, **no se decide arbitrariamente**: se documenta la duda en la entrada del experimento y se informa el Reality Check con y sin esa variante. Cada variante de una ablación (quitar una feature) cuenta si se mira su resultado OOS.
 
@@ -536,7 +538,7 @@ Walk-forward, 90 folds, costos `typical` salvo donde se indica. A = baseline (EX
 **Decisión.** (1) Las features de régimen quedan implementadas y probadas pero **apagadas por defecto** (`REGIME_FEATURES=False`); no se usan en los experimentos siguientes salvo como componente de una estructura distinta. (2) No se hace control de placebo ni ablación: R1 no se cumplió, así que no hay mejora que explicar. (3) Holdout cerrado; sin candidato. Experimentos de búsqueda seguidos sin avance: 3 (EXP-001, 002, 008; los metodológicos no cuentan); el umbral para revisar el rumbo es 10, pero la señal es consistente: **el costo (≈ 0,25 % por operación) y la falta de información en condiciones simples sorteadas aleatoriamente** dominan, no la falta de features.
 **Próximo paso (a decidir con el usuario).** Opciones: (a) condiciones estructuradas "contexto + disparador" (idea B): los tres operandos de régimen como contexto y un disparador rápido, con muchas menos combinaciones que la búsqueda aleatoria; (b) cambiar la relación costo/ganancia (TP/SL más grandes o proporcionales al ATR, horizontes más largos: menos operaciones y más recorrido por operación frente a un costo fijo); (c) validez adicional (CPCV, PBO sobre el lift). No se avanza con ATR, volumen ni otras features hasta que se decida.
 
-### EXP-009 — Búsqueda estructurada "contexto + disparador" vs búsqueda aleatoria [EN CURSO] (2026-10-05)
+### EXP-009 — Búsqueda estructurada "contexto + disparador" vs búsqueda aleatoria (2026-10-05)
 **Pregunta.** ¿Es mejor buscar condiciones como combinaciones aleatorias de features, o como una estructura explícita de contexto de mercado + evento disparador, con un presupuesto de candidatos comparable? Se evalúa el *procedimiento de búsqueda*, no una condición particular.
 **Hipótesis (del usuario, registrada antes de correr):** el problema puede estar parcialmente en cómo se buscan las condiciones; una búsqueda que separe un contexto lento de un disparador rápido puede producir menos hipótesis efectivas, menos selección por azar y mejor generalización OOS. **Predicción de Claude (escrita antes de correr):** no pasa R1 ni R2; selecciona *menos* condiciones en TRAIN que la búsqueda aleatoria (estructuras más raras → muchas con < 30 operaciones) y un mejor-IN algo menor; PBO no mejor de forma consistente; la rentabilidad sigue limitada por el costo (≈ 0,25 % por operación).
 **Representación (explícita, no etiquetada a posteriori).** Nuevo tipo `ContextTrigger(context, trigger)` en `conditions.py`: el constructor *exige* que el contexto sea un ESTADO y el disparador un EVENTO (si no, `ValueError`). Se confirma en la vela t sólo si al cierre de t el contexto es verdadero Y el disparador ocurre en esa misma vela; entrada en `Open[t+1]` (sin cambios). Como el disparador es un evento, un contexto verdadero durante 50 velas no genera 50 entradas (test). Profundidad: contexto ≤ 2, disparador ≤ 2, total = 1 + máx(contexto, disparador) ≤ `MAX_CONDITION_DEPTH` (= 3 para esta búsqueda); la etapa 2 (combinaciones) se omite en este modo.
@@ -563,6 +565,60 @@ Walk-forward, 90 folds, costos `typical` salvo donde se indica. A = baseline (EX
 **Comparación de PBO.** `run_pbo.py --search-mode structured` (semillas 42 y 7) vs A0 (EXP-004) y A1 (EXP-008): PBO, mejor IN, mejor OUT, brecha IN − OUT (¿S la reduce?; "peor IN pero mejor OUT" sería lo más interesante, pero debe pasar los criterios OOS para valer).
 **Comandos.** `pixi run python run_research.py --csv "D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv" --walk-forward --wf-train-bars 2500 --wf-val-bars 720 --side LONG SHORT --tp 0.05 --sl 0.03 --horizon 100 --cooldown-mode until_exit --filter-mode both --cost-scenario typical --no-events --search-mode structured --depth 3 --output results/exp009/structured`; `run_lookahead.py --search-mode structured`; `run_pbo.py --search-mode structured --seed {42,7}`; comparación `run_structure_comparison.py`.
 
+**Resultados (2026-10-05).** Look-ahead de las estructuras (`run_lookahead.py --search-mode structured`, 5.000 estructuras LONG/SHORT, 6.054 operandos, 15 cortes): **0/6.054** operandos, **0/5.000** señales y **0/600** chequeos de entradas con diferencias (informativo: 687/6.054 operandos dependen del arranque de la historia: los de ventana larga). Presupuesto cumplido: **7.500 condiciones evaluadas por fold y lado** en S (675.000 por lado; 0 descartadas por repetidas; 675.000 intentos = 675.000 evaluadas), igual que A0 y A1.
+
+Walk-forward de 90 folds, costos `typical` salvo donde se indica. A0 = aleatoria sin features de régimen (EXP-002), A1 = aleatoria con las features de régimen (EXP-008), S = estructurada:
+
+| | A0 LONG | A1 LONG | **S LONG** | A0 SHORT | A1 SHORT | **S SHORT** |
+|---|---|---|---|---|---|---|
+| Neto OOS agrupado (todas las entradas) | −0,191 % | −0,219 % | **−0,351 %** | −0,146 % | −0,136 % | **−0,085 %** |
+| Ídem `conservative` | −0,344 % | −0,376 % | −0,515 % | −0,296 % | −0,287 % | −0,258 % |
+| Media por fold del neto | −0,154 % | −0,060 % | −0,110 % | −0,184 % | −0,255 % | −0,191 % |
+| Media por fold del lift | +0,053 % | +0,107 % | +0,110 % | −0,020 % | −0,029 % | −0,003 % |
+| t entre folds, neto | −1,56 | −0,55 | −1,00 | −1,89 | −2,59 | −1,68 |
+| t entre folds, lift | +1,13 | +1,84 | +1,76 | −0,43 | −0,64 | −0,05 |
+| `oos_hac_t_3H` neto (lift) | −1,99 (+0,04) | −1,96 (+0,13) | −2,42 (−0,17) | −0,89 (−0,12) | −1,03 (−0,14) | −1,22 (−1,05) |
+| Folds con neto > 0 (de los que operaron) | 39/89 | 37/89 | 34/82 | 37/74 | 33/78 | 32/68 |
+| Folds que superan la línea base | 52 | 55 | 50 | 31 | 34 | 34 |
+| Folds con neto > 0 en `conservative` | 32 | 32 | 29 | 31 | 32 | 27 |
+| Operaciones OOS | 895.090 | 722.946 | **44.935** | 492.594 | 394.254 | **43.501** |
+| Condiciones seleccionadas en TRAIN (suma de folds) | 70.595 | 56.795 | **4.870** | 44.549 | 35.992 | **5.187** |
+| Sobreviven también el filtro de VALIDATION | 83 | 82 | 0 | 58 | 47 | 5 |
+| Fracción media de seleccionadas con neto OOS > 0 | 42,2 % | 42,0 % | 43,3 % | 46,1 % | 42,4 % | 43,9 % |
+| Fracción media que supera la línea base OOS | 52,3 % | 51,8 % | 54,2 % | 49,4 % | 48,3 % | 50,0 % |
+
+**R1 (S − baseline, mismos folds; 4 comparaciones):**
+| | dif. media por fold (neto) | t pareado | t pareado `conservative` | HAC (3H) de la diferencia | bootstrap p(S > base) | R1 |
+|---|---|---|---|---|---|---|
+| S vs A1 LONG (primaria) | +0,044 % | 0,93 (n = 82) | 1,03 | 1,53 | 0,077 | NO |
+| S vs A1 SHORT (primaria) | +0,015 % | 0,30 (n = 68) | 0,38 | 0,80 | 0,195 | NO |
+| S vs A0 LONG | +0,069 % | 1,26 | 1,34 | 1,57 | 0,064 | NO |
+| S vs A0 SHORT | +0,013 % | 0,25 | 0,31 | 0,60 | 0,253 | NO |
+**R2 (candidato, K = 8):** ningún lado: t entre folds de neto −1,00 (LONG) y −1,68 (SHORT), `conservative` negativo (−0,52 % y −0,26 %), HAC −2,42 y −1,22 → NO.
+**Reality Check** (bloque 300, 1.000 remuestreos), K = 8 (EXP-001, A0, A1, S; cada uno LONG/SHORT; T = 52.240): benchmark cero, `typical`: p = 1,000 (S LONG individual 0,97; S SHORT 0,80); exceso sobre la línea base, `typical`: p = 0,937 (mejor A1 LONG, individual 0,38; S LONG 0,54, S SHORT 0,89); `conservative`: 1,000 / 0,946. Sensibilidad K = 6 sin EXP-001 (T = 64.800): 0,999 / 0,870 / 1,000 / 0,879.
+**PBO del proceso de selección** (7.500 condiciones, 16 bloques; semillas 42 / 7):
+
+| | PBO | Mejor IN | Esa misma OUT | IN − OUT | P(pérdida OUT) | % condiciones con media > 0 en todo el desarrollo |
+|---|---|---|---|---|---|---|
+| A0 LONG | 0,72 / 0,49 | +0,87 / +0,97 % | −0,30 / −0,09 % | 1,16 / 1,05 pp | 0,84 / 0,62 | 13 / 13 |
+| A1 LONG | 0,60 / 0,24 | +1,45 / +1,46 % | −0,24 / +0,13 % | 1,69 / 1,33 pp | 0,70 / 0,33 | 15 / 15 |
+| **S LONG** | 0,43 / 0,38 | +1,88 / +1,84 % | +0,06 / +0,12 % | 1,82 / 1,72 pp | 0,47 / 0,41 | 39 / 39 |
+| A0 SHORT | 0,24 / 0,28 | +0,94 / +0,94 % | +0,10 / −0,05 % | 0,84 / 0,99 pp | 0,44 / 0,51 | 0,5 / 0,6 |
+| A1 SHORT | 0,34 / 0,23 | +1,21 / +1,22 % | −0,11 / −0,07 % | 1,32 / 1,29 pp | 0,57 / 0,49 | 2,8 / 3,1 |
+| **S SHORT** | 0,44 / 0,42 | +1,75 / +1,75 % | −0,13 / +0,10 % | 1,88 / 1,65 pp | 0,62 / 0,56 | 14 / 14 |
+
+**Lectura.**
+- *Escenario ocurrido:* **(a) S no mejora** (R1 = NO en las 4 comparaciones, R2 = NO). No se cumple el criterio 1 de "evidencia a favor" (mejora OOS estadísticamente defendible), de modo que no hace falta evaluar el resto. Es además un caso parcial de **(d)**: el lado LONG muestra una tendencia a favor (t pareado 0,93–1,26, HAC 1,5–1,6, bootstrap p ≈ 0,06–0,08), pero no alcanza los umbrales fijados de antemano (2,5 y 2) y el SHORT casi no se mueve; con 4 comparaciones corregidas no es defendible. El retorno agrupado de S LONG es *peor* (−0,35 % vs −0,22 %); el de S SHORT algo mejor (−0,09 % vs −0,14 %): no es una mejora consistente.
+- *Qué sí cambia con la estructura:* (i) **entre 9 y 16 veces menos operaciones OOS y entre 7 y 12 veces menos condiciones seleccionadas** en TRAIN (los disparadores son eventos raros y muchas estructuras no llegan al mínimo de casos): menos exposición al costo, pero el lift por fold queda igual que en A1 (LONG +0,110 % vs +0,107 %; SHORT −0,003 % vs −0,029 %). (ii) La fracción de seleccionadas con neto OOS > 0 (43 %) y de las que superan la base (54 % / 50 %) es la de siempre. (iii) La filtración de VALIDATION casi vacía (0 y 5 sobrevivientes) es mecánica: con un mes de VALIDATION casi ninguna estructura reúne 30 operaciones; no afecta al retorno OOS agrupado, que no depende de ese filtro.
+- *PBO / ganadores aparentes:* S tiene un mejor IN mucho más alto (+1,75 a +1,88 % vs +0,9 a +1,5 %), una fracción de condiciones "positivas" en todo el desarrollo de 39 % (LONG) y 14 % (SHORT) —contra 15 % y 3 % en A1—, y una brecha IN − OUT *mayor* (1,65–1,88 pp vs 1,3–1,7 pp en A1). El mejor OUT es algo más alto (LONG +0,06/+0,12 %; SHORT −0,13/+0,10 %), pero la PBO sola no cambia claramente (promedio LONG 0,41 vs 0,42 en A1; SHORT 0,43 vs 0,29) y la variación entre semillas (±0,2) es mayor que las diferencias. **No ocurrió "peor IN pero mejor OUT"**: S tiene mejor IN y un OUT apenas mayor. Los "positivos" en todo el desarrollo (39 %) reflejan sobre todo que las estructuras coherentes con la dirección heredan el sesgo direccional del período de desarrollo, no información: fuera de muestra se desvanecen (R1/R2).
+- *Reality Check:* no contradice ni respalda (p ≥ 0,87 en todas las variantes).
+- *Predicción previa:* acertada en que S no pasa R1 ni R2 y en que selecciona menos condiciones en TRAIN (7–12×); **errada** en que S tendría un mejor-IN algo menor (resultó mayor).
+- **Respuesta a la pregunta de EXP-009:** con este diseño (4 familias de disparador, 3 de contexto, 7.500 candidatos por fold, TP 5 %/SL 3 %/H 100 y costos `typical`), buscar con una estructura explícita contexto + disparador **no es mejor** que buscar combinaciones aleatorias: no mejora la generalización OOS de forma defendible, aunque reduce entre 9 y 16 veces el número de operaciones. Ningún procedimiento probado (A0, A1, S) es rentable fuera de muestra.
+
+**Cuentas.** Hipótesis de este experimento: 1.350.000 (S, walk-forward: 7.500 × 90 folds × 2 lados) + 30.000 (PBO de S) = 1.380.000; **acumulado 4.291.500**. (Una primera corrida del walk-forward se interrumpió en el fold 34 por lentitud —competía por CPU con otras corridas— y se relanzó con la misma configuración y semilla tras acelerar el cálculo de features con memoria por DataFrame, que da exactamente los mismos valores; no se miraron sus resultados parciales y las condiciones regeneradas son las mismas, así que no suman hipótesis.) **K = 8** desde este experimento (S LONG y S SHORT se agregan al universo; una variante por lado, sin ablaciones; ver su definición arriba).
+**Decisión.** (1) El generador estructurado queda implementado y probado (`SEARCH_MODE="structured"`, apagado por defecto); no se sigue refinando triggers para "hacerlo funcionar" (cada cambio sería una variante nueva que sube K y las hipótesis). (2) Holdout cerrado; sin candidato. (3) Experimentos de búsqueda seguidos sin avance: **4** (EXP-001, 002, 008, 009); el umbral de CLAUDE.md para revisar el rumbo es 10, pero el patrón es consistente en los cuatro: ningún procedimiento supera el costo, y ni más features ni más estructura cambian eso. La explicación más simple, compatible con todos los resultados, es que **el costo (≈ 0,25 % por operación) es del mismo orden que cualquier efecto detectable con TP 5 % / SL 3 % y condiciones sobre BTC 1h**.
+**Próximo paso (a decidir con el usuario).** Con la variable "forma de buscar" y la variable "información de contexto" ya exploradas sin resultado, la palanca que queda es la **relación costo/ganancia**: TP/SL mayores o proporcionales al ATR, horizontes más largos y/o temporalidades más lentas (menos operaciones y más recorrido por operación frente a un costo casi fijo). También: abrir la discusión sobre si la búsqueda de reglas de entrada sobre una sola serie (BTC 1h) tiene salida, o si conviene ampliar a otros activos. No se avanza con ATR, volumen ni otras features hasta que se decida.
+
 ---
 
 ## 4. Plan
@@ -576,7 +632,7 @@ Siguiente (alta prioridad, completa la línea de validez):
 
 Hoja de ruta original, conservada:
 4. ~~Features de régimen: tendencia en temporalidades mayores (4h, diario) y volatilidad relativa~~ (hecho en EXP-008: sin mejora OOS).
-5. Condiciones con lógica "contexto + disparador" y búsqueda por estados/eventos (idea B).
+5. ~~Condiciones con lógica "contexto + disparador" y búsqueda por estados/eventos (idea B)~~ (hecho en EXP-009: sin mejora OOS; breakout queda como variante futura por requerir un operando nuevo).
 6. TP/SL proporcionales al ATR.
 7. Volumen y hora del día / día de la semana; otras features.
 8. Periodicidad de re-search/retraining (ampliar EXP-002).
