@@ -24,11 +24,35 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any
+import weakref
 
 import numpy as np
 import pandas as pd
 
 from .indicators import INDICATORS
+
+# Memoria de cálculos intermedios compartidos entre operandos (sólo velocidad, nunca resultados):
+# el ATR de un período dado y la geometría de las velas superiores se repiten en miles de operandos
+# distintos sobre el MISMO DataFrame. Se guarda por objeto DataFrame y se libera cuando éste se
+# destruye; los DataFrames recortados/perturbados de las pruebas de look-ahead son objetos nuevos.
+_DF_CACHES: dict[int, dict] = {}
+
+
+def _cache_for(df: pd.DataFrame) -> dict:
+    k = id(df)
+    c = _DF_CACHES.get(k)
+    if c is None:
+        c = _DF_CACHES[k] = {}
+        weakref.finalize(df, _DF_CACHES.pop, k, None)
+    return c
+
+
+def _atr(df: pd.DataFrame, period: int) -> np.ndarray:
+    c = _cache_for(df)
+    key = ("atr", period)
+    if key not in c:
+        c[key] = Indicator("ATR", (period,)).compute(df)
+    return c[key]
 
 
 class Operand(ABC):
@@ -174,7 +198,7 @@ class ATRPercent(Operand):
     def scale(self): return "atr_pct"
 
     def compute(self, df):
-        a = Indicator("ATR", (self.period,)).compute(df)
+        a = _atr(df, self.period)
         return a / df["Close"].to_numpy(dtype="float64")
 
     def to_dict(self): return {"type": "atr_pct", "period": self.period}
@@ -206,20 +230,24 @@ class HTFTrend(Operand):
     def scale(self): return f"htftrend_{self.tf}"
 
     def compute(self, df):
-        ts = df.index.as_unit("ns").asi8.astype("int64")   # ns UTC (tz-aware: ya es UTC; la unidad del índice puede ser s, ms, us)
-        tf_ns = int(pd.Timedelta(self.tf).value)
-        base_ns = int(self.base_min) * 60 * 10 ** 9
-        bucket = ts // tf_ns
-        new_run = np.r_[True, bucket[1:] != bucket[:-1]]
-        rid = np.cumsum(new_run) - 1                   # índice de vela superior (por tramo)
-        last = np.flatnonzero(np.r_[new_run[1:], True])   # última vela base de cada tramo
-        hclose = df["Close"].to_numpy(dtype="float64")[last]
+        c = _cache_for(df)
+        gkey = ("htf", self.tf, self.base_min)
+        if gkey not in c:
+            ts = df.index.as_unit("ns").asi8.astype("int64")   # ns UTC (tz-aware: ya es UTC; la unidad puede ser s, ms, us)
+            tf_ns = int(pd.Timedelta(self.tf).value)
+            base_ns = int(self.base_min) * 60 * 10 ** 9
+            bucket = ts // tf_ns
+            new_run = np.r_[True, bucket[1:] != bucket[:-1]]
+            rid = np.cumsum(new_run) - 1                   # índice de vela superior (por tramo)
+            last = np.flatnonzero(np.r_[new_run[1:], True])   # última vela base de cada tramo
+            final = ((ts + base_ns) % tf_ns) == 0          # esta vela cierra su vela superior
+            c[gkey] = (rid, final, df["Close"].to_numpy(dtype="float64")[last])
+        rid, final, hclose = c[gkey]
         sma = np.full(len(hclose), np.nan)
         if len(hclose) >= self.n:
             cs = np.cumsum(np.r_[0.0, hclose])
             sma[self.n - 1:] = (cs[self.n:] - cs[:-self.n]) / self.n
         trend = hclose / sma - 1.0
-        final = ((ts + base_ns) % tf_ns) == 0          # esta vela cierra su vela superior
         k = np.where(final, rid, rid - 1)
         out = np.full(len(df), np.nan)
         ok = k >= 0
@@ -243,8 +271,8 @@ class RelativeVolatility(Operand):
     def scale(self): return "relvol"
 
     def compute(self, df):
-        a = Indicator("ATR", (self.short,)).compute(df)
-        b = Indicator("ATR", (self.long,)).compute(df)
+        a = _atr(df, self.short)
+        b = _atr(df, self.long)
         with np.errstate(invalid="ignore", divide="ignore"):
             return a / b
 
