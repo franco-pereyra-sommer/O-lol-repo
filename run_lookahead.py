@@ -49,6 +49,7 @@ def main() -> None:
     p.add_argument("--horizon", type=int, default=100)
     p.add_argument("--seed", type=int, default=11)
     p.add_argument("--regime-features", action="store_true")
+    p.add_argument("--search-mode", choices=("random", "structured"), default="random")
     p.add_argument("--out", default=None)
     a = p.parse_args()
 
@@ -61,9 +62,17 @@ def main() -> None:
     print(f"Datos: {n} velas; cortes k = {ks}")
 
     store = RecordingStore(df)
-    gen = ConditionGenerator(cfg0, store, slice(0, int(n * 0.6)), np.random.default_rng(a.seed))
-    simple = gen.generate_simple(a.n_simple)
-    conds = simple + gen.generate_complex(simple, a.n_complex, 3)
+    if a.search_mode == "structured":
+        import dataclasses
+        conds = []
+        for side in ("LONG", "SHORT"):
+            cfg_s = dataclasses.replace(cfg0, POSITION_TYPE=side, SEARCH_MODE="structured")
+            gen = ConditionGenerator(cfg_s, store, slice(0, int(n * 0.6)), np.random.default_rng(a.seed))
+            conds += gen.generate_structured((a.n_simple + a.n_complex) // 2)
+    else:
+        gen = ConditionGenerator(cfg0, store, slice(0, int(n * 0.6)), np.random.default_rng(a.seed))
+        simple = gen.generate_simple(a.n_simple)
+        conds = simple + gen.generate_complex(simple, a.n_complex, 3)
     sigs = {c.key: c.evaluate(store) for c in conds}
     ops = store.operands
     print(f"{len(conds)} condiciones, {len(ops)} operandos distintos")
@@ -79,7 +88,7 @@ def main() -> None:
     res["conditions_failed"] = {k: v for k, v in f_cond.items() if v}
     print(f"[2] condiciones con señal distinta hasta k: {len(res['conditions_failed'])}/{len(conds)}")
 
-    sub = conds[: a.n_entry_conds]
+    sub = conds[:: max(1, len(conds) // a.n_entry_conds)][: a.n_entry_conds]
     for mode, cd in (("until_exit", 1), ("fixed", 15)):
         cfg = ResearchConfig(MAX_HOLDING_BARS=a.horizon, COOLDOWN_MODE=mode,
                              MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES=cd)

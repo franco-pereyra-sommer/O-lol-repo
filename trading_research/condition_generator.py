@@ -24,7 +24,8 @@ import math
 import numpy as np
 import pandas as pd
 
-from .conditions import And, Compare, Condition, Cross, Not, OccurredWithin, Or, Then
+from .conditions import (And, Compare, Condition, ContextTrigger, Cross, Not, OccurredWithin, Or,
+                         Then)
 from .config import ResearchConfig
 from .features import (ATRPercent, CandleFeature, Constant, FeatureStore, HTFTrend, Indicator,
                        Operand, PriceField, RelativeVolatility, ReturnFeature)
@@ -50,6 +51,9 @@ class ConditionGenerator:
         self.rng = rng
         self.ranges = param_ranges(cfg)
         self.base_min = max(1, int(round(pd.Timedelta(cfg.TIMEFRAME).total_seconds() / 60)))
+        # Contabilidad del presupuesto de búsqueda (EXP-009): intentos de sorteo, condiciones
+        # distintas generadas y sorteos descartados por repetidos.
+        self.stats: dict[str, int] = {"attempts": 0, "generated": 0, "discarded_duplicate": 0}
 
     # ------------------------------------------------------------------ #
     # Operandos
@@ -105,7 +109,7 @@ class ConditionGenerator:
             return ATRPercent(self._randint(r))
         return self._indicator("MACD", self._choice(("line", "hist")))
 
-    def _threshold_for(self, op: Operand) -> Constant:
+    def _threshold_for(self, op: Operand, qrange: tuple[float, float] | None = None) -> Constant:
         # Las salidas de MACD están en unidades de precio (no estacionarias):
         # el único umbral fijo con sentido es 0.
         if isinstance(op, Indicator) and op.name == "MACD":
@@ -114,7 +118,7 @@ class ConditionGenerator:
         vals = vals[np.isfinite(vals)]
         if len(vals) == 0:
             return Constant(0.0)
-        lo, hi = self.cfg.THRESHOLD_QUANTILE_RANGE
+        lo, hi = qrange or self.cfg.THRESHOLD_QUANTILE_RANGE
         q = float(self.rng.uniform(lo, hi))
         return Constant(_round_sig(float(np.quantile(vals, q)), self.cfg.THRESHOLD_SIGNIFICANT_DIGITS))
 
@@ -177,7 +181,95 @@ class ConditionGenerator:
                 continue
             seen.add(c.key)
             out.append(c)
+        self.stats = {"attempts": attempts, "generated": len(out), "discarded_duplicate": attempts - len(out)}
         log.info("Etapa 1: %d condiciones simples generadas (%d intentos).", len(out), attempts)
+        return out
+
+    # ------------------------------------------------------------------ #
+    # Búsqueda estructurada "contexto + disparador" (EXP-009)
+    # ------------------------------------------------------------------ #
+    def _weighted(self, weights: dict[str, float], allowed: set[str] | None = None) -> str:
+        keys = [k for k in weights if allowed is None or k in allowed]
+        w = np.array([weights[k] for k in keys], dtype=float)
+        return keys[int(self.rng.choice(len(keys), p=w / w.sum()))]
+
+    def _context_leaf(self, side: str) -> Compare:
+        """Una hoja de contexto (ESTADO): tendencia 4h/1D o volatilidad relativa contra un umbral
+        sorteado de la distribución en TRAIN. LONG = contexto alcista (tendencia > umbral, mitad alta);
+        SHORT = bajista (tendencia < umbral, mitad baja). La volatilidad relativa no tiene dirección:
+        el operador se sortea."""
+        fam = self._weighted(self.cfg.STRUCT_CONTEXT_WEIGHTS)
+        op = self._regime_operand(fam)
+        if fam == "relvol":
+            return Compare(op, self._choice(("<", ">")), self._threshold_for(op))
+        long_ = side == "LONG"
+        rng_q = (self.cfg.STRUCT_TREND_QUANTILE_RANGE_LONG if long_
+                 else self.cfg.STRUCT_TREND_QUANTILE_RANGE_SHORT)
+        return Compare(op, ">" if long_ else "<", self._threshold_for(op, rng_q))
+
+    def _context(self, side: str, max_depth: int) -> Condition:
+        n_parts = 1 if max_depth < 2 else int(self.rng.integers(1, 3))
+        first = self._context_leaf(side)
+        if n_parts == 1:
+            return first
+        for _ in range(20):
+            second = self._context_leaf(side)
+            if second.key != first.key:
+                return And(first, second)
+        return first
+
+    def _trigger(self, side: str, max_depth: int) -> Condition:
+        direction = "above" if side == "LONG" else "below"
+        fam = self._weighted(self.cfg.STRUCT_TRIGGER_WEIGHTS,
+                             None if max_depth >= 2 else {"rsi_cross", "macd_cross", "ret_cross"})
+        if fam == "rsi_cross":
+            a = self._indicator("RSI")
+            return Cross(a, self._threshold_for(a), direction)
+        if fam == "macd_cross":
+            a = self._indicator("MACD", "line")
+            return Cross(a, Indicator("MACD", a.params, "signal"), direction)
+        if fam == "ret_cross":
+            a = ReturnFeature(int(self._choice(self.cfg.RETURN_PERIODS)))
+            return Cross(a, self._threshold_for(a), direction)
+        # rsi_recovery: dos umbrales x_bajo < x_alto del RSI (cuantiles q1 < q2 en TRAIN)
+        a = self._indicator("RSI")
+        vals = self.store.get(a)[self.train_slice]
+        vals = vals[np.isfinite(vals)]
+        lo_q, hi_q = self.cfg.THRESHOLD_QUANTILE_RANGE
+        q1, q2 = sorted(float(x) for x in self.rng.uniform(lo_q, hi_q, 2))
+        d = self.cfg.THRESHOLD_SIGNIFICANT_DIGITS
+        x_lo, x_hi = (_round_sig(float(np.quantile(vals, q)), d) for q in (q1, q2))
+        n = self._window()
+        if not x_lo < x_hi:
+            x_hi = x_lo + 1.0
+        if side == "LONG":    # estuvo en zona baja y se recupera cruzando x_alto hacia arriba
+            return And(OccurredWithin(Compare(a, "<", Constant(x_lo)), n), Cross(a, Constant(x_hi), "above"))
+        return And(OccurredWithin(Compare(a, ">", Constant(x_hi)), n), Cross(a, Constant(x_lo), "below"))
+
+    def random_structured(self) -> ContextTrigger:
+        c = self.cfg
+        side = c.POSITION_TYPE
+        c_max = min(c.STRUCT_CONTEXT_MAX_DEPTH, c.MAX_CONDITION_DEPTH - 1)
+        t_max = min(c.STRUCT_TRIGGER_MAX_DEPTH, c.MAX_CONDITION_DEPTH - 1)
+        if c_max < 1 or t_max < 1:
+            raise ValueError("La búsqueda estructurada requiere MAX_CONDITION_DEPTH >= 2.")
+        cond = ContextTrigger(self._context(side, c_max), self._trigger(side, t_max))
+        assert cond.depth <= c.MAX_CONDITION_DEPTH
+        return cond
+
+    def generate_structured(self, n: int) -> list[Condition]:
+        out, seen = [], set()
+        attempts = 0
+        while len(out) < n and attempts < n * 50:
+            attempts += 1
+            cond = self.random_structured()
+            if cond.key in seen:
+                continue
+            seen.add(cond.key)
+            out.append(cond)
+        self.stats = {"attempts": attempts, "generated": len(out), "discarded_duplicate": attempts - len(out)}
+        log.info("Búsqueda estructurada (%s): %d condiciones (%d intentos).",
+                 self.cfg.POSITION_TYPE, len(out), attempts)
         return out
 
     # ------------------------------------------------------------------ #

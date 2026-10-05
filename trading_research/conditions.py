@@ -10,6 +10,7 @@ Nodos compuestos:
   And(X, Y), Or(X, Y), Not(X)
   Then(X, Y, n)              X ocurre en t1, Y en t2, t1 < t2 <= t1+n;
                              se confirma en t2.
+  ContextTrigger(C, T)       C (ESTADO) y T (EVENTO) en la misma vela t (EXP-009).
   OccurredWithin(X, n)       X fue verdadera en alguna vela de [t-n, t-1].
 
 Garantía anti look-ahead: cada nodo, al evaluarse en t, sólo usa valores de
@@ -300,6 +301,45 @@ class Then(Condition):
         return {"node": "then", "a": self.a.to_dict(), "b": self.b.to_dict(), "n": self.n}
 
 
+class ContextTrigger(Condition):
+    """
+    Condición estructurada (EXP-009):   CONTEXT(...)  AND  TRIGGER(...)
+
+    La separación es parte del tipo, no una etiqueta: el constructor exige que el CONTEXTO sea un
+    ESTADO (puede seguir verdadero muchas velas) y que el DISPARADOR sea un EVENTO (ocurre en velas
+    puntuales). Se confirma en la vela t sólo si, al cierre de t, el contexto es verdadero Y el
+    disparador ocurre en esa misma vela; la entrada sigue siendo Open[t+1]. Como el disparador es un
+    evento, un contexto verdadero durante 50 velas produce entradas sólo en las velas del evento y
+    no una por vela. Equivale a And(contexto, disparador) para la evaluación; la diferencia es que
+    la estructura queda registrada y validada (describe(), to_dict(), leaves del contexto vs. del
+    disparador) y el generador sólo puede construirla con esta forma.
+    """
+
+    def __init__(self, context: Condition, trigger: Condition):
+        if context.kind != Kind.STATE:
+            raise ValueError(f"El contexto debe ser un ESTADO, no {context.kind.value}: {context.describe()}")
+        if trigger.kind != Kind.EVENT:
+            raise ValueError(f"El disparador debe ser un EVENTO, no {trigger.kind.value}: {trigger.describe()}")
+        self.context, self.trigger = context, trigger
+
+    def _eval(self, store):
+        vc, dc = self.context.evaluate_pair(store)
+        vt, dt = self.trigger.evaluate_pair(store)
+        d = dc & dt
+        return vc & vt & d, d
+
+    @property
+    def key(self): return f"CTX[{self.context.key}]&TRG[{self.trigger.key}]"
+    def describe(self): return f"CONTEXT[{self.context.describe()}] AND TRIGGER[{self.trigger.describe()}]"
+    @property
+    def depth(self): return 1 + max(self.context.depth, self.trigger.depth)
+    @property
+    def kind(self): return Kind.EVENT
+    def leaves(self): return self.context.leaves() + self.trigger.leaves()
+    def to_dict(self):
+        return {"node": "structured", "context": self.context.to_dict(), "trigger": self.trigger.to_dict()}
+
+
 def condition_from_dict(d: dict[str, Any]) -> Condition:
     n = d["node"]
     if n == "compare":
@@ -314,6 +354,8 @@ def condition_from_dict(d: dict[str, Any]) -> Condition:
         return Not(condition_from_dict(d["a"]))
     if n == "within":
         return OccurredWithin(condition_from_dict(d["a"]), d["n"])
+    if n == "structured":
+        return ContextTrigger(condition_from_dict(d["context"]), condition_from_dict(d["trigger"]))
     if n == "then":
         return Then(condition_from_dict(d["a"]), condition_from_dict(d["b"]), d["n"])
     raise ValueError(f"Nodo desconocido: {n}")

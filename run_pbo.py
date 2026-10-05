@@ -41,6 +41,7 @@ def main() -> None:
     p.add_argument("--min-trades", type=int, default=30)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--regime-features", action="store_true")
+    p.add_argument("--search-mode", choices=("random", "structured"), default="random")
     p.add_argument("--out", default=None, help="JSON de salida.")
     a = p.parse_args()
 
@@ -49,8 +50,9 @@ def main() -> None:
         cfg = ResearchConfig(DATA_SOURCE="csv", CSV_PATH=a.csv, POSITION_TYPE=side,
                              TP_PERCENT=a.tp, SL_PERCENT=a.sl, MAX_HOLDING_BARS=a.horizon,
                              COOLDOWN_MODE="until_exit", RANDOM_SEED=a.seed,
-                             N_SIMPLE_CONDITIONS=a.n_conditions, MAX_CONDITION_DEPTH=1,
-                             REGIME_FEATURES=a.regime_features)
+                             N_SIMPLE_CONDITIONS=a.n_conditions, MAX_CONDITION_DEPTH=3 if a.search_mode == "structured" else 1,
+                             REGIME_FEATURES=a.regime_features,
+                             SEARCH_MODE=a.search_mode)
         df = load_data(cfg)
         n_dev = int(round(len(df) * (1 - a.holdout)))
         edges = np.linspace(0, n_dev, a.blocks + 1).astype(int)
@@ -58,7 +60,9 @@ def main() -> None:
         store = FeatureStore(df)
         table = build_outcome_table(df, cfg)
         gen = ConditionGenerator(cfg, store, slice(0, n_dev), np.random.default_rng(a.seed))
-        conds = gen.generate_simple(a.n_conditions)
+        conds = (gen.generate_structured(a.n_conditions) if a.search_mode == "structured"
+                 else gen.generate_simple(a.n_conditions))
+        print(f"{side}: generador {gen.stats}")
         sums = np.zeros((a.blocks, len(conds)))
         cnts = np.zeros_like(sums)
         for j, c in enumerate(conds):

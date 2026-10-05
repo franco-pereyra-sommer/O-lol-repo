@@ -59,6 +59,8 @@ def parse_args() -> argparse.Namespace:
     g = p.add_argument_group("búsqueda")
     g.add_argument("--seed", type=int, default=d.RANDOM_SEED)
     g.add_argument("--depth", type=int, default=d.MAX_CONDITION_DEPTH, help="MAX_CONDITION_DEPTH")
+    g.add_argument("--search-mode", choices=("random", "structured"), default="random",
+                   help="random = generador aleatorio; structured = contexto + disparador (EXP-009; usar --depth 3).")
     g.add_argument("--regime-features", action="store_true",
                    help="Agregar al generador tendencia 4h, tendencia diaria y volatilidad relativa (EXP-008).")
     g.add_argument("--n-simple", type=int, default=d.N_SIMPLE_CONDITIONS)
@@ -133,7 +135,7 @@ def base_config(a: argparse.Namespace) -> ResearchConfig:
         ASSET=a.asset, TIMEFRAME=a.timeframe,
         TRAIN_FRACTION=a.train, VALIDATION_FRACTION=a.val,
         TEST_FRACTION=round(1.0 - a.train - a.val, 10),
-        RANDOM_SEED=a.seed, MAX_CONDITION_DEPTH=a.depth, REGIME_FEATURES=a.regime_features,
+        RANDOM_SEED=a.seed, MAX_CONDITION_DEPTH=a.depth, REGIME_FEATURES=a.regime_features, SEARCH_MODE=a.search_mode,
         N_SIMPLE_CONDITIONS=a.n_simple, N_COMPLEX_CONDITIONS=a.n_complex,
         STAGE2_POOL_SIZE=a.pool_size,
         MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES=a.cooldown, COOLDOWN_MODE=a.cooldown_mode,

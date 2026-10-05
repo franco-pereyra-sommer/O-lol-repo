@@ -112,6 +112,27 @@ class ResearchConfig:
     HTF_TREND_PERIOD_RANGE_1D: tuple[int, int] = (5, 100)    # n velas diarias
     RELVOL_SHORT_RANGE: tuple[int, int] = (5, 30)
     RELVOL_LONG_RANGE: tuple[int, int] = (60, 300)
+    # Búsqueda estructurada "contexto + disparador" (EXP-009). SEARCH_MODE="random" (por defecto) usa
+    # el generador aleatorio de siempre; "structured" genera sólo ContextTrigger coherentes con la
+    # dirección (POSITION_TYPE): LONG = contexto alcista + disparador "long"; SHORT = lo opuesto.
+    SEARCH_MODE: str = "random"
+    # Profundidad máxima del contexto y del disparador; además profundidad total <= MAX_CONDITION_DEPTH.
+    STRUCT_CONTEXT_MAX_DEPTH: int = 2
+    STRUCT_TRIGGER_MAX_DEPTH: int = 2
+    # Cuantiles del operando de tendencia (TRAIN) entre los que se sortea el umbral del contexto:
+    # LONG usa "tendencia > umbral" con q en la mitad alta; SHORT, "tendencia < umbral" con q en la baja.
+    STRUCT_TREND_QUANTILE_RANGE_LONG: tuple[float, float] = (0.50, 0.95)
+    STRUCT_TREND_QUANTILE_RANGE_SHORT: tuple[float, float] = (0.05, 0.50)
+    # Familias de contexto (hojas) y sus pesos; el contexto tiene 1 o 2 hojas distintas unidas por AND.
+    STRUCT_CONTEXT_WEIGHTS: dict[str, float] = field(default_factory=lambda: {
+        "htf4": 1.0, "htf1d": 1.0, "relvol": 1.0})
+    # Familias de disparador (eventos) y sus pesos. Todas se expresan con el árbol existente.
+    #   rsi_cross      RSI(p) cruza X (LONG: por encima, SHORT: por debajo)
+    #   macd_cross     línea MACD cruza su señal
+    #   ret_cross      return(N) cruza X
+    #   rsi_recovery   RSI estuvo en la zona extrema (< X_bajo, LONG) en las N velas previas Y cruza X_alto
+    STRUCT_TRIGGER_WEIGHTS: dict[str, float] = field(default_factory=lambda: {
+        "rsi_cross": 1.0, "macd_cross": 1.0, "ret_cross": 1.0, "rsi_recovery": 1.0})
     # Cifras significativas al redondear umbrales (legibilidad).
     THRESHOLD_SIGNIFICANT_DIGITS: int = 3
     # Probabilidades relativas de cada tipo de condición simple.
@@ -248,6 +269,8 @@ class ResearchConfig:
 
     # ------------------------------------------------------------------ #
     def validate(self) -> None:
+        if self.SEARCH_MODE not in ("random", "structured"):
+            raise ValueError("SEARCH_MODE debe ser 'random' o 'structured'.")
         if (self.COOLDOWN_MODE == "fixed"
                 and self.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES < self.MAX_HOLDING_BARS):
             warnings.warn(

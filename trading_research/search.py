@@ -150,14 +150,19 @@ class ResearchPipeline:
             baselines.pop("TEST", None)  # ni siquiera la línea base del TEST se mira
 
         # --- Etapa 1
-        simple = self.generator.generate_simple(cfg.N_SIMPLE_CONDITIONS)
+        structured = cfg.SEARCH_MODE == "structured"
+        if structured:
+            simple = self.generator.generate_structured(cfg.N_SIMPLE_CONDITIONS)
+        else:
+            simple = self.generator.generate_simple(cfg.N_SIMPLE_CONDITIONS)
+        gen_stats = dict(self.generator.stats)
         rows1, _ = self._evaluate_many(simple, seg["TRAIN"], "simple", baselines["TRAIN"], set())
         pool = self._select_pool(rows1, simple)
 
         # --- Etapa 2
-        complex_ = self.generator.generate_complex(
+        complex_ = ([] if structured else self.generator.generate_complex(
             pool, cfg.N_COMPLEX_CONDITIONS, cfg.MAX_CONDITION_DEPTH,
-            exclude_keys={c.key for c in simple})
+            exclude_keys={c.key for c in simple}))
         rows2, _ = self._evaluate_many(complex_, seg["TRAIN"], "complex", baselines["TRAIN"], set())
 
         all_conds = simple + complex_
@@ -207,6 +212,8 @@ class ResearchPipeline:
                              "end": str(self.df.index[s.end - 1]), "n_bars": s.n_bars,
                              "min_cases": min_cases_required(cfg, s.n_bars)}
                          for k, s in seg.items()},
+            "search_mode": cfg.SEARCH_MODE,
+            "generation": gen_stats,
             "n_conditions_evaluated_simple": len(simple),
             "n_conditions_evaluated_complex": len(complex_),
             "n_conditions_evaluated_total": len(all_conds),

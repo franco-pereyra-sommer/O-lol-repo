@@ -151,6 +151,8 @@ def fold_summary(i: int, res: SearchResult, df_index: pd.DatetimeIndex, seg: dic
         "val_start": df_index[va.start], "val_end": df_index[va.end - 1],
         "val_price_change": None,
         "n_evaluated": res.meta["n_conditions_evaluated_total"],
+        "n_attempts": res.meta.get("generation", {}).get("attempts"),
+        "n_discarded_duplicate": res.meta.get("generation", {}).get("discarded_duplicate"),
         "selected_in_train": res.meta["n_passed_train"],
         "passed_val": res.meta["n_passed_validation"],
         "base_val_P_TP": base["P_TP_FIRST"],
