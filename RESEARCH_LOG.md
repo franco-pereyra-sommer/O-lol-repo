@@ -39,6 +39,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 | EXP-011 | Escala temporal: BTCUSDT 4h vs 1h con la misma duración de operación (H = 25 barras de 4h = 100 h), mismo TP/SL, misma búsqueda | Cerrado | **Escenario A (4h no mejora)**: costos por operación, operaciones por condición y ventana (≈ 11,3) y retorno bruto (≈ 0) son iguales en 1h y 4h; la diferencia 4h − 1h no es significativa (t pareado −0,6 y −0,3; Reality Check p ≥ 0,86). Con exits en % y horizonte en horas, cambiar la escala de las barras no cambia el cociente costo/movimiento capturado. |
 | EXP-012 | Escala del objetivo: TP/SL y horizonte ×2, ×3 y ×4 (TRAIN/VAL escalados) | Cerrado (**no concluyente**) | Escenario formal A (sin evidencia de predictibilidad: lift bruto +0,26 %/fold con t = 1,26 en V1 LONG, nada significativo), pero **V2 y V3 casi no seleccionaron condiciones** (1 y 0 folds con operaciones) porque el mínimo efectivo de operaciones en TRAIN subió a 50/75/100 en vez de 30 (error de Claude: `MIN_CASES_FRACTION` escala con el TRAIN). A escalas grandes la línea base sin condición ya gana en LONG por la deriva de BTC: sólo el lift es interpretable. |
 | EXP-012b | Repetición de EXP-012 con el mínimo efectivo de 30 operaciones (corrige la desviación) | Cerrado | **Escenario A informativo**: con selección suficiente (41/29, 25/17 y 14/10 folds con operaciones), el lift bruto por fold va de −0,22 % a +0,25 % con t entre −0,84 y +1,44 (umbrales 3,11–3,35); Reality Check de predictibilidad p = 0,97. El bruto/neto positivo en LONG a escalas grandes es la deriva de BTC (la línea base sin condición lo reproduce); sólo el lift es interpretable. |
+| EXP-013 | Rama a2: regla diaria "comprado o en efectivo" (3 reglas fijas: tendencia 20 y 100 días, calma) contra exposición constante igualada | **Preregistrado** (en curso) | Diseño y criterio de candidato adaptado fijados antes de correr; K 30 → 33. |
 
 ### 0.3 Respuestas a las preguntas de revisión
 
@@ -71,6 +72,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 7. **Lo que sigue lo decidís vos.** Hay 8 experimentos de búsqueda seguidos sin avance (EXP-001, 002, 008, 009, 010, 011, 012, 012b; CLAUDE.md pide revisar el rumbo a los 10). EXP-011 mostró por qué pasar a 4h no cambió nada: con TP/SL en % y horizonte en horas, la operación dura lo mismo (≈ 36–41 h), se repite el mismo número de veces por mes y paga el mismo costo; y el retorno bruto es ≈ 0 en todos los diseños. Lo que cambiaría el cociente costo/movimiento es la escala del *objetivo*. Opciones (cada una suma variantes a K): (a) objetivos más grandes frente al costo (TP/SL y horizonte escalados, con o sin temporalidad más lenta), sabiendo que con bruto ≈ 0 se espera "perder menos" y no ganar; (b) otros activos/mercados (otra estructura de costos, más historia independiente); (c) revisar el objetivo del proyecto, porque en seis experimentos las entradas seleccionadas no superan a una caminata sin ventaja; (d) más validez estadística (CPCV, PBO sobre el lift).
 - **Estado tras EXP-012b (propuesta; decide el usuario):** ocho experimentos de búsqueda de entradas técnicas aleatorias sobre BTCUSDT (más información, más estructura, otra salida, otra temporalidad, otra escala del objetivo) no muestran lift bruto detectable. Estamos a dos del umbral de CLAUDE.md (10) para revisar el rumbo; conviene hacerlo ahora. Opciones: (a) cambiar el objeto de estudio y no la búsqueda: otros activos/mercados con historia independiente, o reglas que no sean de entrada (tamaño/gestión, filtros de régimen como "no operar"); (b) una prueba de "techo de información" sin selección (¿existe predictibilidad de la dirección con modelos simples sobre las mismas features, medida por lift OOS?); (c) más validez (CPCV, PBO sobre el lift); (d) dar por cerrada la línea de entradas técnicas simples en BTC. Nada se ejecuta sin autorización.
 - **Decisión del usuario (2026-10-06): se elige la opción (a), cambiar el objeto de estudio.** Todavía **no se definió cuál de las dos ramas** (otros activos/mercados, o reglas que no son de entrada como filtros "no operar" o tamaño/gestión) ni el diseño; eso se decide al arrancar la conversación siguiente, y cualquier descarga de datos de otros activos o costos distintos requiere autorización explícita. Contexto para retomar: `HANDOFF.md`.
+- **Decisión del usuario (2026-10-06, conversación siguiente): rama a2** (reglas que no son de entrada), frente a a1 (el mismo método en ETH, XRP y BNB; K 30 → 36, ≈ 3,9 M hipótesis, descarga de datos). Se diseñó como **EXP-013**: tres reglas fijas de "comprado o en efectivo" revisadas una vez por día, comparadas contra mantener siempre la misma exposición promedio (así la suba de BTC no cuenta como mérito). El usuario autorizó el criterio de candidato adaptado (incluido el mínimo de 30 entradas) y **reiniciar en 0 el contador de experimentos seguidos sin avance** (los 8 de la línea de entradas quedan registrados). Detalle y reglas en la entrada EXP-013.
 - *Lección sobre horizontes largos:* en un activo con tendencia, el retorno bruto o neto absoluto de LONG crece con el horizonte aun sin ninguna señal (la línea base sin condición lo reproduce); sólo el lift contra la línea base de la misma ventana y geometría es interpretable. Y: el mínimo efectivo de operaciones es `max(30, 1 % de las barras del TRAIN)`; al cambiar la longitud del TRAIN hay que decidirlo explícitamente (EXP-012/012b).
 - *Decisiones tomadas por Claude que conviene que conozcas y puedas revertir:* (a) se enmendó el criterio de candidato a "t entre folds ≥ 3" (EXP-003); (b) se fijó en 1 % el ATR supuesto en las primeras velas del modelo de slippage (EXP-006); (c) se agregó la regla 7 (Bonferroni con la cuenta K).
 
@@ -937,6 +939,71 @@ La mejora del *bruto* de V2b LONG respecto de B0 (+1,39 pp por operación, t +2,
 **Cuentas.** Hipótesis de este experimento: **1.350.000** (V1b 645.000 + V2b 405.000 + V3b 300.000); PBO 0; **acumulado 13.831.500**. **K = 30**. Holdout cerrado.
 **Decisión.** (1) Escenario **A informativo**: con el mínimo de 30 operaciones, escalar conjuntamente TP, SL, H, TRAIN y VALIDATION por k = 2, 3, 4 no revela predictibilidad (lift bruto/neto ≈ 0, HAC, bootstrap, Reality Check y consistencia entre escalas negativos). La primera corrida (EXP-012) queda como corrida deficiente conservada en la bitácora; la conclusión vigente es la de EXP-012b. (2) Las mejoras aparentes de bruto/neto en LONG son deriva (la línea base sin condición las reproduce): lección general para cualquier horizonte largo en un activo con tendencia: **sólo el lift es interpretable**. (3) No se encadena EXP-013. (4) Experimentos de búsqueda seguidos sin avance: **8** (EXP-001, 002, 008, 009, 010, 011, 012, 012b); CLAUDE.md pide revisar el rumbo a los 10.
 **Próximo paso (propuesta; decide el usuario).** Ocho experimentos de búsqueda sobre BTCUSDT con condiciones técnicas aleatorias (más información, más estructura, otra salida, otra temporalidad, otra escala) no muestran lift bruto detectable, ni en la ventana original ni a escalas mayores. Antes de seguir conviene revisar el rumbo (umbral de CLAUDE.md: 10; estamos en 8). Opciones: (a) cambiar el objeto de estudio y no la búsqueda: otros activos/mercados con historia independiente, o reglas que no sean de entrada (tamaño/gestión, filtros de régimen como *no operar*); (b) una prueba de "techo de información" sin selección (p. ej., predecibilidad de la dirección del retorno con modelos simples sobre las mismas features, medida por lift fuera de muestra) para saber si existe algo que buscar; (c) más validez (CPCV, PBO sobre el lift); (d) dar por cerrada la línea de entradas técnicas simples en BTC y documentar la conclusión. Ninguna se ejecuta sin autorización.
+
+### EXP-013 — Regla de exposición "estar o no estar comprado" en BTC (rama a2 de la opción (a)) (2026-10-06)
+**Origen.** Revisión de rumbo tras 8 experimentos de búsqueda de entradas sin avance (sección 0.3, punto 4). El usuario eligió la opción (a) "cambiar el objeto de estudio" y, entre sus dos ramas, la **a2** (reglas que no son de entrada). La otra rama propuesta, a1, consistía en aplicar el mismo procedimiento B0 a ETH, XRP y BNB: K 30 → 36, ≈ 3,9 millones de hipótesis y descarga de datos; queda sin hacer. El usuario decidió además **reiniciar en 0 el contador de experimentos seguidos sin avance**: los 8 de la línea de entradas en BTC (EXP-001, 002, 008, 009, 010, 011, 012, 012b) quedan registrados y éste es el primero de la línea nueva. Al elegir a2 autorizó el **criterio de candidato adaptado** de abajo, incluido el mínimo de 30 entradas.
+**Pregunta.** ¿Hay períodos de días o semanas en que conviene no tener BTC, identificables sólo con información pasada? Concretamente: ¿una regla diaria de "comprado o en efectivo" le gana, después de costos, a mantener siempre la misma exposición promedio? Es el filtro "no operar" en su forma más pura. Se aplica a "estar siempre comprado" porque las entradas buscadas hasta ahora no tienen lift que filtrar (EXP-001 a 012b).
+**Qué es nuevo respecto de lo anterior.** La salida no es TP/SL/horizonte sino el cambio de estado. La escala es de días a semanas. La referencia no es "entrar en todas las velas" sino una exposición constante igualada. EXP-008 usó features de la misma familia como condiciones de entrada con TP 5 %/SL 3 % (operaciones de ≈ 40 h); no es la misma pregunta.
+
+**Reglas (fijas, sin búsqueda de parámetros; sólo comprado/efectivo, sin SHORT).**
+| Regla | "Comprado" si… | Operando (implementado y con tests de causalidad desde EXP-008) |
+|---|---|---|
+| R1 tendencia corta | el último cierre diario completo está por encima de la media de los últimos 20 cierres diarios | `HTFTrend("1D", 20) > 0` |
+| R2 tendencia larga | ídem con 100 días | `HTFTrend("1D", 100) > 0` |
+| R3 calma | la volatilidad de las últimas ≈ 24 h es menor que la de las últimas ≈ 240 h | `RelativeVolatility(24, 240) < 1` (ATR de Wilder) |
+Valor no definido (NaN) → efectivo. No ocurre en el período evaluado: el calentamiento más largo (100 días) termina antes de la primera ventana; se informa el conteo igual.
+
+**Mecánica (causal).**
+- *Revisión diaria.* En la primera vela de cada día UTC presente en los datos (normalmente la de 00:00), la posición pasa a ser el estado de la regla evaluado al cierre de la vela anterior. En las demás velas la posición se mantiene.
+- *Ejecución.* La posición de la vela j se decide con datos hasta j−1 y se mantiene de Open[j] a Open[j+1]. En la última vela de cada ventana se mantiene hasta su Close, para no usar precios de la ventana siguiente ni del holdout.
+- *Continuidad.* La estrategia es continua entre ventanas: no se liquida al final de cada una. Empieza en efectivo al comienzo de la primera ventana y se liquida al final de la última.
+- *Costos.* Cada cambio (entrada o salida) es una orden de mercado: comisión taker + medio spread + slippage del escenario, como fracción del capital, cargada en la vela del cambio. `typical` ≈ 0,125 % por lado (decide). `conservative` = 0,10 % + 0,025 % + 0,03 % + 0,05 × ATR(14)/Close de la vela anterior (robustez). `optimistic` sólo se reporta. Los parámetros son los de siempre; no se cambian.
+- *Retornos.* Simples, por vela y sumados (sin reinversión), igual que en el resto de la bitácora.
+- *Ventanas.* Las mismas 90 VALIDATION de B0 (`make_folds` con TRAIN 2.500 / VAL 720 sobre BTCUSDT 1h, holdout 15 % cerrado). Período evaluado: velas 3.123 a 67.922, ≈ 2017-12-25 a 2025-05-22, 64.800 h. No hay TRAIN porque no se ajusta nada.
+
+**Benchmark (lo central).** *Exposición constante igualada:* mantener siempre una fracción ē del capital en BTC, sin costos, con ē = exposición promedio de la regla en todo el período evaluado. Rendimiento por vela de la regla menos el del benchmark: `d_j = pos_j·r_j − costo_j − ē·r_j`. Así, la deriva alcista de BTC (que la regla captura en proporción a su exposición) no cuenta como mérito: sólo cuenta acertar *cuándo* estar. ē usa todo el período, pero es sólo la vara de comparación y no interviene en la decisión de la regla. Como información se informan también "comprar y mantener" (ē = 1) y la regla en términos absolutos.
+
+**Métricas.**
+- Por ventana w: lift neto `L_w = Σ_{j∈w} d_j` (`typical`) y lift bruto `G_w = Σ_{j∈w} (pos_j − ē)·r_j`.
+- t entre ventanas: 90 ventanas, 89 g.l.
+- HAC Newey-West sobre la serie horaria d_j con **720 rezagos** (una ventana; los episodios duran días o semanas).
+
+**Criterio de candidato (adaptación de la regla 4, fijada ahora y autorizada por el usuario).** Una regla es candidata si cumple las seis condiciones:
+- C1. La media de L_w es > 0, con t entre ventanas ≥ **3,05** (= máx(3; Bonferroni(K = 33; 89 g.l.)) = 3,048).
+- C2. El t HAC de d_j (`typical`, 720 rezagos) es ≥ 2.
+- C3. Σ L_w > 0 en al menos **4 de 5 tramos** consecutivos de 18 ventanas. Es la traducción de "4 de 5 folds": consistencia entre regímenes.
+- C4. El lift neto agrupado (Σ_w L_w) es > 0 también con `conservative`.
+- C5. La regla gana en términos absolutos: Σ_j (pos_j·r_j − costo_j) > 0 con `typical` y con `conservative`.
+- C6. Hay al menos **30 entradas** (pasajes de efectivo a comprado) en el período. Reemplaza a las 100 operaciones porque cada episodio dura días o semanas.
+Una regla es *evaluable* si tiene ≥ 30 entradas y 0 < ē < 1.
+
+**Escenarios (fijados antes de correr; la métrica es `typical`).**
+- **A (sin valor de timing):** ninguna regla tiene t entre ventanas ≥ 2 en el lift neto ni en el bruto. Es "A informativo" si las tres son evaluables; si no, se indica cuál no lo es.
+- **B (nominal):** alguna regla tiene t ≥ 2 (lift neto o bruto) pero no cumple C1–C6. Se informa, no se persigue y no se encadena.
+- **C (candidato):** alguna regla cumple C1–C6. Se frena todo y se presenta al usuario; el holdout no se abre sin su autorización.
+- **D (no concluyente):** falla la verificación de causalidad sobre los datos reales (se ejecuta antes de calcular cualquier retorno) o hay un error de cálculo. No se interpreta nada.
+
+*Corrección por pruebas múltiples:* una sola por familia, y decide el umbral Bonferroni de C1 (K = 33). Como información, sin poder de decisión, se informa el Reality Check sobre las tres series d_j, con bloques medios de 1.200 h (principal) y 300 h.
+
+**Contabilidad (antes de correr).**
+- Hipótesis nuevas: 3 reglas × 90 ventanas = **270**. Acumulado: 13.831.500 → **13.831.770**.
+- **K: 30 → 33.** Mismo activo, mismos datos y misma historia OOS que las 30 variantes anteriores, y cada regla podría reportarse como "el resultado" (regla 7).
+- Contador de experimentos seguidos sin avance: reiniciado en 0 por decisión del usuario; éste es el 1.º de la línea nueva.
+**Código y tests (antes de correr).** Módulo nuevo `trading_research/exposure.py` (reglas, posiciones diarias, retornos por ventana, costos por cambio, benchmark y métricas) y script `run_exposure.py`. Tests:
+1. Causalidad: la posición de las velas 0..k+1 no cambia al truncar los datos en k ni al reemplazar los precios posteriores a k (cortes a distintas horas, con huecos en los datos).
+2. La posición sólo cambia en la primera vela de cada día UTC.
+3. Regla "siempre comprado": lift ≡ 0, exactamente una entrada y una salida.
+4. Costos: cada cambio paga un lado.
+5. Las ventanas son idénticas a las de B0.
+6. La última vela de cada ventana no usa precios fuera de ella.
+
+Antes de calcular retornos, `run_exposure.py` repite la verificación de causalidad sobre los datos reales (truncar y perturbar en 200 cortes al azar) y aborta si falla.
+**Qué NO se hace.**
+- No se agregan reglas ni se cambian parámetros después de ver resultados: 20 y 100 días, 24/240 h, revisión diaria, 720 rezagos, 30 entradas y tramos de 18 ventanas quedan fijos.
+- No se combinan reglas ni se prueba la versión SHORT.
+- No se abre el holdout y no se encadena EXP-014.
+**Comando.** `pixi run python run_exposure.py --csv "D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv" --output results/exp013`.
+**Preparación hecha antes de correr con datos reales.** Tests: 115 pasan (107 + 8 nuevos en `tests/test_exposure.py`). Se verificó que el test de causalidad detecta una versión adulterada que usa el estado de la misma vela (lo detecta en R3) y que un "canario" que mira el cierre siguiente rompe la invariancia. Prueba en seco del script completo sobre un paseo al azar sintético de 79.909 velas (sin datos reales): corre de punta a punta y da escenario A, con t del lift neto entre −0,56 y +0,88 (no inventa señal en ruido).
 
 ---
 
