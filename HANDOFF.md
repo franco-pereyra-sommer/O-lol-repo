@@ -2,6 +2,12 @@
 
 Este archivo existe para retomar el trabajo en una conversación nueva sin perder contexto. **Lo que decide es `RESEARCH_LOG.md` (sección 0 y reglas de la sección 2); acá sólo está lo que el log no dice** (acuerdos hechos de palabra, trampas del entorno y la decisión pendiente). Si algo de acá contradice al log o a `CLAUDE.md`, mandan ellos.
 
+## 0. Actualización (2026-10-06, después de EXP-013) — leer primero
+- Lo que sigue abajo (secciones 1 a 8) se escribió **antes** de EXP-013 y quedó desactualizado en lo que dice de la rama pendiente; lo vigente es esto y la sección 0 del log.
+- El usuario eligió la **rama a2** y **reiniciar en 0 el contador de experimentos seguidos sin avance**. Se preregistró y corrió **EXP-013**: tres reglas fijas de "comprado o en efectivo" (tendencia de 20 y 100 días, calma 24/240 h) contra exposición constante igualada. Resultado: **escenario A informativo**, sin candidato. R2 (tendencia de 100 días) quedó como observación: positiva en los 5 tramos, pero con t 1,76 contra 3,05. R3 es significativamente peor que la exposición constante.
+- Cuentas: **K = 33**, **13.831.770 hipótesis**, contador sin avance = 1, holdout cerrado, sin push. Código nuevo: `trading_research/exposure.py`, `run_exposure.py`, `tests/test_exposure.py` (115 tests pasan).
+- **Próximo paso sin decidir** (opciones en la entrada EXP-013 del log): cerrar la línea, confirmar R2 tal cual en otros activos (requiere autorización de datos y costos) o la rama a1.
+
 ## 1. Qué decidió el usuario
 - Eligió la **opción (a) de la sección 0.3 del log: cambiar el objeto de estudio** (no seguir buscando entradas técnicas aleatorias sobre BTCUSDT 1h).
 - **No se definió todavía qué rama ni qué diseño.** Esa es la primera tarea de la conversación nueva: proponer el diseño y **preguntar** antes de correr nada.
