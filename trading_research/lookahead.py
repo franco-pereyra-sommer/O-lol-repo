@@ -230,12 +230,12 @@ def check_resample_causality(df1h: pd.DataFrame, conds: list[Condition], positio
                     fails["ohlc"] += 1
                     continue
             st = FeatureStore(d4)
+            t1 = build_outcome_table(d4, cfg)
             for c, s0, e0 in zip(conds, sig0, ent0):
                 s1 = c.evaluate(st)
                 if not np.array_equal(s0[:m_row], s1[:m_row]):
                     fails["signals"] += 1
                     continue
-                t1 = build_outcome_table(d4, cfg)
                 e1 = detect_entries(s1, Segment("F", 0, len(d4)), cfg.MAX_HOLDING_BARS, 1, "until_exit",
                                     t1.exit_offset)
                 a0, a1 = e0.confirm_idx[e0.confirm_idx < m_row - 1], e1.confirm_idx[e1.confirm_idx < m_row - 1]

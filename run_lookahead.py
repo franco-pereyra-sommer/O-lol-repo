@@ -15,6 +15,7 @@ import json
 from collections import defaultdict
 
 import numpy as np
+import pandas as pd
 
 from trading_research.condition_generator import ConditionGenerator
 from trading_research.config import ResearchConfig
@@ -49,6 +50,8 @@ def main() -> None:
     p.add_argument("--horizon", type=int, default=100)
     p.add_argument("--seed", type=int, default=11)
     p.add_argument("--regime-features", action="store_true")
+    p.add_argument("--timeframe", default="1h")
+    p.add_argument("--csv-timeframe", default="")
     p.add_argument("--exit-mode", choices=("fixed", "atr"), default="fixed")
     p.add_argument("--tp-atr", type=float, default=2.0)
     p.add_argument("--sl-atr", type=float, default=1.0)
@@ -57,7 +60,8 @@ def main() -> None:
     a = p.parse_args()
 
     cfg0 = ResearchConfig(DATA_SOURCE="csv", CSV_PATH=a.csv, MAX_CONDITION_DEPTH=3,
-                          REGIME_FEATURES=a.regime_features)
+                          REGIME_FEATURES=a.regime_features, TIMEFRAME=a.timeframe,
+                          CSV_TIMEFRAME=a.csv_timeframe)
     df = load_data(cfg0)
     n = len(df)
     rng = np.random.default_rng(a.seed)
@@ -109,6 +113,19 @@ def main() -> None:
             fx = check_exit_levels(df, cfg_x, ks, rng)
             res[f"exit_levels_failed_{side}"] = fx
             print(f"[3b] niveles de TP/SL por ATR ({side}, {a.tp_atr:g}/{a.sl_atr:g}) con cambios hasta k: {fx}")
+    if a.csv_timeframe and a.csv_timeframe != a.timeframe:
+        import dataclasses
+        from trading_research.lookahead import check_resample_causality
+        df1 = load_data(dataclasses.replace(cfg0, TIMEFRAME=a.csv_timeframe, CSV_TIMEFRAME=""))
+        hrs = int(pd.Timedelta(a.timeframe) / pd.Timedelta(a.csv_timeframe))
+        pos = sorted({int(x) for x in rng.integers(2000, len(df1) - 4000, 6)}
+                     | {int(x) + o for x in rng.integers(2000, len(df1) - 4000, 2) for o in range(hrs)})
+        cfg_r = ResearchConfig(MAX_HOLDING_BARS=a.horizon, COOLDOWN_MODE="until_exit", TIMEFRAME=a.timeframe)
+        fr = check_resample_causality(df1, sub[:60], pos, rng, cfg=cfg_r)
+        res["resample_causality"] = fr
+        print(f"[3c] causalidad del remuestreo {a.csv_timeframe}->{a.timeframe} "
+              f"({len(pos)} posiciones x 5 variantes: mismo bloque, bloque siguiente, bloque posterior, "
+              f"futuro reemplazado, truncado): {fr}")
     starts = [1000, 5000, 20000]
     sens = startup_sensitivity(df, ops, starts)
     res["startup_sensitive"] = {k: v for k, v in sens.items() if v}
