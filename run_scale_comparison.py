@@ -83,6 +83,10 @@ def main() -> None:
     ap.add_argument("--v10", nargs=4, default=None)
     ap.add_argument("--h4", default=None)
     ap.add_argument("--pbo-dir", default="results/exp012")
+    ap.add_argument("--K", type=int, default=24, help="K del Reality Check (umbral absoluto = máx(3, Bonferroni(K))).")
+    ap.add_argument("--n-comp", type=int, default=6, help="Comparaciones contra B0 (umbral relativo = máx(2,5, Bonferroni)).")
+    ap.add_argument("--tag", default="EXP012")
+    ap.add_argument("--v-old", nargs=3, default=None, help="Variantes de la corrida anterior (EXP-012) que se mantienen en K.")
     ap.add_argument("--out", default=None)
     ap.add_argument("--boot", type=int, default=1000)
     a = ap.parse_args()
@@ -109,8 +113,8 @@ def main() -> None:
 
     # ------------------------------------------------------------------ por fold propio
     FS = {k: fold_stats(z, summ, idx) for k, (summ, ag, z) in runs.items()}
-    thr_abs = {nm: max(3.0, bonferroni_t_threshold(24, len(runs[(nm, "LONG")][0]) - 1)) for nm in VAR}
-    thr_rel = {nm: max(2.5, bonferroni_t_threshold(6, len(runs[(nm, "LONG")][0]) - 1)) for nm in VAR}
+    thr_abs = {nm: max(3.0, bonferroni_t_threshold(a.K, len(runs[(nm, "LONG")][0]) - 1)) for nm in VAR}
+    thr_rel = {nm: max(2.5, bonferroni_t_threshold(a.n_comp, len(runs[(nm, "LONG")][0]) - 1)) for nm in VAR}
     out["thresholds"] = {"absolute": thr_abs, "relative": thr_rel}
     rows, series_hac = {}, {}
     for (nm, s), (summ, ag, z) in runs.items():
@@ -244,7 +248,16 @@ def main() -> None:
     pred_cov = np.all([runs[k][2]["covered"] for k in runs], axis=0)
     pidx = np.flatnonzero(pred_cov)
     names = [f"{nm}|{s}" for nm in VAR for s in SIDES]
-    F = np.column_stack([procedure_series(runs[(nm, s)][2], "gross", "lift")[pidx] for nm in VAR for s in SIDES])
+    extra = {}
+    if a.v_old:
+        for i, d in enumerate(a.v_old, 1):
+            for s in SIDES:
+                extra[f"old-V{i}|{s}"] = load(find(d, s))[2]
+        pred_cov = pred_cov & np.all([z["covered"] for z in extra.values()], axis=0)
+        pidx = np.flatnonzero(pred_cov)
+        names += list(extra)
+    cols = [runs[(nm, s)][2] for nm in VAR for s in SIDES] + list(extra.values())
+    F = np.column_stack([procedure_series(z, "gross", "lift")[pidx] for z in cols])
     out["RC_pred"] = []
     rc_pred_primary = {}
     for blk in (1200, 300):
@@ -276,11 +289,16 @@ def main() -> None:
         for s in SIDES:
             df4 = load_data(ResearchConfig(TIMEFRAME="4h", CSV_TIMEFRAME="1h", **base))
             uni[f"EXP011(4h)|{s}"] = to_hour_grid(load(find(a.h4, s))[2], df4.index, idx, 4)
+    if a.v_old:
+        for i, d in enumerate(a.v_old, 1):
+            for s in SIDES:
+                uni[f"EXP012old-V{i}|{s}"] = load(find(d, s))[2]
     for nm in ("V1", "V2", "V3"):
         for s in SIDES:
-            uni[f"EXP012-{nm}|{s}"] = runs[(nm, s)][2]
+            uni[f"{a.tag}-{nm}|{s}"] = runs[(nm, s)][2]
     uidx = np.flatnonzero(np.all([v["covered"] for v in uni.values()], axis=0))
     print(f"  K = {len(uni)}, T = {len(uidx)} h")
+    assert len(uni) == a.K or a.tag == "EXP012", (len(uni), a.K)
     out["RC"] = []
     for blk in (300, 1200):
         for sc in ("typical", "conservative"):
@@ -288,10 +306,10 @@ def main() -> None:
                 G = np.column_stack([procedure_series(v, sc, bm)[uidx] for v in uni.values()])
                 rc = reality_check(G, n_boot=a.boot, mean_block=blk, seed=0)
                 ind = {n: reality_check(G[:, [j]], n_boot=a.boot, mean_block=blk, seed=0)["p_value"] for j, n in enumerate(uni)}
-                new = {n: q for n, q in ind.items() if n.startswith("EXP012")}
+                new = {n: q for n, q in ind.items() if n.startswith(a.tag + "-")}
                 out["RC"].append({"block": blk, "scenario": sc, "benchmark": bm, "K": len(uni), "T": int(len(uidx)), "rc_p": rc["p_value"],
                                   "best": list(uni)[rc["best"]], "individual_p": ind})
-                print(f"  bloque {blk:>4} {sc:<12} {bm:<5} RC p = {rc['p_value']:.3f} mejor = {list(uni)[rc['best']]:<16} | menor p de EXP-012: "
+                print(f"  bloque {blk:>4} {sc:<12} {bm:<5} RC p = {rc['p_value']:.3f} mejor = {list(uni)[rc['best']]:<16} | menor p de la corrida actual: "
                       f"{min(new, key=new.get)}={min(new.values()):.2f}")
 
     # ------------------------------------------------------------------ PBO

@@ -115,3 +115,21 @@ def test_wf_series_has_gross_alias_base_gross_and_duration_histogram():
     assert s["hold_hist"][0] == 0                                           # duración mínima 1 barra
     assert (s["hold_sum"].sum() / s["cnt"].sum()) == pytest.approx((np.arange(H + 1) * s["hold_hist"]).sum() / s["hold_hist"].sum())
     assert np.isfinite(s["base_gross"][cov]).all()
+
+
+def test_effective_minimum_trades_depends_on_train_length_unless_fraction_is_zero():
+    """Lección de EXP-012: el mínimo efectivo es max(30, 1 % de las barras del segmento). Con MIN_CASES_FRACTION = 0 es 30."""
+    from trading_research.statistics import min_cases_required
+    d = ResearchConfig()
+    assert [min_cases_required(d, 2500 * k) for k in (1, 2, 3, 4)] == [30, 50, 75, 100]
+    z = ResearchConfig(MIN_CASES_FRACTION=0.0)
+    assert [min_cases_required(z, 2500 * k) for k in (1, 2, 3, 4)] == [30, 30, 30, 30]
+    assert [min_cases_required(z, 720 * k) for k in (1, 2, 3, 4)] == [30, 30, 30, 30]
+
+
+def test_cli_min_cases_frac_zero_reaches_the_config(monkeypatch):
+    import run_research
+    argv = ["run_research.py", "--csv", "x.csv", "--min-cases-frac", "0", "--min-cases", "30"]
+    monkeypatch.setattr(sys, "argv", argv)
+    cfg = run_research.base_config(run_research.parse_args())
+    assert cfg.MIN_CASES_FRACTION == 0.0 and cfg.MIN_CASES_ABSOLUTE == 30
