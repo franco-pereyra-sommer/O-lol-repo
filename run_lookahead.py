@@ -20,7 +20,7 @@ from trading_research.condition_generator import ConditionGenerator
 from trading_research.config import ResearchConfig
 from trading_research.data import load_data
 from trading_research.features import FeatureStore
-from trading_research.lookahead import (RecordingStore, check_conditions, check_entries,
+from trading_research.lookahead import (RecordingStore, check_conditions, check_entries, check_exit_levels,
                                         check_operands, startup_sensitivity)
 
 
@@ -49,6 +49,9 @@ def main() -> None:
     p.add_argument("--horizon", type=int, default=100)
     p.add_argument("--seed", type=int, default=11)
     p.add_argument("--regime-features", action="store_true")
+    p.add_argument("--exit-mode", choices=("fixed", "atr"), default="fixed")
+    p.add_argument("--tp-atr", type=float, default=2.0)
+    p.add_argument("--sl-atr", type=float, default=1.0)
     p.add_argument("--search-mode", choices=("random", "structured"), default="random")
     p.add_argument("--out", default=None)
     a = p.parse_args()
@@ -91,13 +94,21 @@ def main() -> None:
     sub = conds[:: max(1, len(conds) // a.n_entry_conds)][: a.n_entry_conds]
     for mode, cd in (("until_exit", 1), ("fixed", 15)):
         cfg = ResearchConfig(MAX_HOLDING_BARS=a.horizon, COOLDOWN_MODE=mode,
-                             MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES=cd)
+                             MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES=cd, EXIT_MODE=a.exit_mode,
+                             TP_ATR_MULT=a.tp_atr, SL_ATR_MULT=a.sl_atr)
         fns = {c.key: (lambda d, c=c: c.evaluate(FeatureStore(d))) for c in sub}
         f_ent = check_entries(df, fns, cfg, ks)
         bad = {k: v for k, v in f_ent.items() if v}
         res[f"entries_failed_{mode}"] = bad
         print(f"[3] entradas ({mode}, H={a.horizon}) con diferencias: {len(bad)}/{len(sub)}")
 
+    if a.exit_mode == "atr":
+        for side in ("LONG", "SHORT"):
+            cfg_x = ResearchConfig(MAX_HOLDING_BARS=a.horizon, EXIT_MODE="atr", TP_ATR_MULT=a.tp_atr,
+                                   SL_ATR_MULT=a.sl_atr, POSITION_TYPE=side)
+            fx = check_exit_levels(df, cfg_x, ks, rng)
+            res[f"exit_levels_failed_{side}"] = fx
+            print(f"[3b] niveles de TP/SL por ATR ({side}, {a.tp_atr:g}/{a.sl_atr:g}) con cambios hasta k: {fx}")
     starts = [1000, 5000, 20000]
     sens = startup_sensitivity(df, ops, starts)
     res["startup_sensitive"] = {k: v for k, v in sens.items() if v}

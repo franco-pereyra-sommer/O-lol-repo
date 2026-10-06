@@ -77,6 +77,11 @@ def parse_args() -> argparse.Namespace:
                    help="Stop loss como fracción (0.02 = 2%%).")
     g.add_argument("--horizon", type=int, nargs="+", default=[d.MAX_HOLDING_BARS],
                    help="Horizonte máximo en velas (MAX_HOLDING_BARS).")
+    g.add_argument("--exit-mode", choices=("fixed", "atr"), default="fixed",
+                   help="fixed = TP/SL como fracción del precio; atr = TP/SL como múltiplos del ATR[t] (EXP-010).")
+    g.add_argument("--tp-atr", type=float, default=2.0, help="Múltiplo de ATR del TP (exit-mode atr).")
+    g.add_argument("--sl-atr", type=float, default=1.0, help="Múltiplo de ATR del SL (exit-mode atr).")
+    g.add_argument("--atr-period", type=int, default=14, help="Período del ATR de las salidas.")
     g.add_argument("--cooldown", type=int, default=d.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES,
                    help="Velas entre entradas de la misma condición (modo fixed).")
     g.add_argument("--cooldown-mode", choices=("fixed", "until_exit"), default=d.COOLDOWN_MODE,
@@ -136,6 +141,7 @@ def base_config(a: argparse.Namespace) -> ResearchConfig:
         TRAIN_FRACTION=a.train, VALIDATION_FRACTION=a.val,
         TEST_FRACTION=round(1.0 - a.train - a.val, 10),
         RANDOM_SEED=a.seed, MAX_CONDITION_DEPTH=a.depth, REGIME_FEATURES=a.regime_features, SEARCH_MODE=a.search_mode,
+        EXIT_MODE=a.exit_mode, TP_ATR_MULT=a.tp_atr, SL_ATR_MULT=a.sl_atr, EXIT_ATR_PERIOD=a.atr_period,
         N_SIMPLE_CONDITIONS=a.n_simple, N_COMPLEX_CONDITIONS=a.n_complex,
         STAGE2_POOL_SIZE=a.pool_size,
         MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES=a.cooldown, COOLDOWN_MODE=a.cooldown_mode,
@@ -213,7 +219,8 @@ def summary_row(res: SearchResult, out: Path) -> dict:
 def print_walk_forward(wf: WalkForwardResult) -> None:
     c, ag = wf.cfg, wf.aggregate
     print("\n" + "=" * 72)
-    print(f"WALK-FORWARD  {c.POSITION_TYPE}  TP={c.TP_PERCENT:g}  SL={c.SL_PERCENT:g}  "
+    print(f"WALK-FORWARD  {c.POSITION_TYPE}  " + (f"TP={c.TP_ATR_MULT:g}ATR  SL={c.SL_ATR_MULT:g}ATR  " if c.EXIT_MODE == "atr"
+                                                      else f"TP={c.TP_PERCENT:g}  SL={c.SL_PERCENT:g}  ") +
           f"horizonte={c.MAX_HOLDING_BARS}  {'anclado' if c.WF_ANCHORED else 'ventana móvil'}  "
           f"filtro={c.FILTER_MODE}  costos={c.COST_SCENARIO}")
     s = wf.summary.copy()

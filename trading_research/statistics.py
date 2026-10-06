@@ -111,6 +111,8 @@ def compute_stats(entry_idx: np.ndarray, table: OutcomeTable, cfg: ResearchConfi
 def run_parameters(cfg: ResearchConfig) -> dict[str, Any]:
     """Parámetros que se adjuntan a cada fila de resultados."""
     return {"asset": cfg.ASSET, "timeframe": cfg.TIMEFRAME, "side": cfg.POSITION_TYPE,
+            "exit_mode": cfg.EXIT_MODE, "tp_atr": cfg.TP_ATR_MULT if cfg.EXIT_MODE == "atr" else None,
+            "sl_atr": cfg.SL_ATR_MULT if cfg.EXIT_MODE == "atr" else None,
             "TP": cfg.TP_PERCENT, "SL": cfg.SL_PERCENT, "holding_horizon": cfg.MAX_HOLDING_BARS,
             "cooldown": cfg.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES,
             "cooldown_mode": cfg.COOLDOWN_MODE, "filter_mode": cfg.FILTER_MODE,
@@ -124,6 +126,8 @@ def baseline_stats(segment: Segment, table: OutcomeTable, cfg: ResearchConfig) -
     """Entrar en TODAS las velas del segmento (sin condición, sin cooldown)."""
     last_ok = segment.end - 1 - cfg.MAX_HOLDING_BARS
     t = np.arange(segment.start, last_ok + 1)
+    if table.entry_valid is not None:           # EXP-010: sin ATR no hay operación
+        t = t[table.entry_valid[t + 1]]
     s = compute_stats(t + 1, table, cfg, segment.n_bars)
     s["condition"] = "BASELINE (todas las velas)"
     return s

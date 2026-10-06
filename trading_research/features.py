@@ -47,6 +47,11 @@ def _cache_for(df: pd.DataFrame) -> dict:
     return c
 
 
+def atr_values(df: pd.DataFrame, period: int) -> np.ndarray:
+    """ATR de Wilder (el mismo indicador de `indicators.atr`), con memoria por DataFrame."""
+    return _atr(df, period)
+
+
 def _atr(df: pd.DataFrame, period: int) -> np.ndarray:
     c = _cache_for(df)
     key = ("atr", period)

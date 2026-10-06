@@ -27,7 +27,7 @@ from .config import ResearchConfig
 from .conditions import Condition
 from .entry_detector import Segment, detect_entries
 from .features import FeatureStore, Operand
-from .outcome_evaluator import build_outcome_table
+from .outcome_evaluator import atr_exit_levels, build_outcome_table
 
 
 class RecordingStore(FeatureStore):
@@ -138,6 +138,22 @@ def check_entries(df: pd.DataFrame, signals: dict, cfg: ResearchConfig,
                     ok &= _same(arr[e], tt.net_by_scenario[sc][e])
                 ok &= _same(table.gross_return[e], tt.gross_return[e])
             fails[key] += 0 if ok else 1
+    return fails
+
+
+def check_exit_levels(df: pd.DataFrame, cfg: ResearchConfig, ks: list[int],
+                      rng: np.random.Generator, modes=("truncate", "perturb")) -> dict[str, int]:
+    """EXP-010: los niveles de TP y SL (y su validez) de toda operación que abre en e <= k no cambian
+    si se borra o se reemplaza el futuro (velas > k). Sólo pueden depender de Open[e] y ATR[e-1]."""
+    tp, sl, ok = atr_exit_levels(df, cfg)
+    fails = {"tp": 0, "sl": 0, "valid": 0}
+    for mode in modes:
+        for k in ks:
+            d2 = modified(df, k, mode, rng)
+            tp2, sl2, ok2 = atr_exit_levels(d2, cfg)
+            fails["tp"] += int(not _same(tp[: k + 1], tp2[: k + 1]))
+            fails["sl"] += int(not _same(sl[: k + 1], sl2[: k + 1]))
+            fails["valid"] += int(not np.array_equal(ok[: k + 1], ok2[: k + 1]))
     return fails
 
 

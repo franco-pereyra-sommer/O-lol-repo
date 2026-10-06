@@ -41,8 +41,9 @@ from .config import ResearchConfig
 from .entry_detector import Segment
 from .features import FeatureStore
 from .multiple_testing import newey_west_t, procedure_series
-from .outcome_evaluator import OutcomeTable, build_outcome_table
-from .search import ResearchPipeline, SearchResult, _json_default, save_results
+from .outcome_evaluator import (AMBIGUOUS, NONE, SL_FIRST, TP_FIRST, OutcomeTable,
+                                build_outcome_table)
+from .search import ResearchPipeline, SearchResult, _json_default, exit_tag, save_results
 
 log = logging.getLogger(__name__)
 
@@ -125,6 +126,18 @@ def oos_series_arrays(entry_lists: list[np.ndarray], table: OutcomeTable, n: int
     out = {"cnt": np.bincount(e, minlength=n).astype(float)}
     for sc, arr in table.net_by_scenario.items():
         out[f"sum_{sc}"] = np.bincount(e, weights=arr[e], minlength=n)
+    # Motivo de salida (EXP-010): cantidad y suma de retornos netos por resultado, más distancias
+    # de TP/SL y duración, para reportar % de TP/SL/NONE/AMBIGUOUS, retorno medio y contribución.
+    oc = table.outcome[e]
+    for code, name in ((TP_FIRST, "TP_FIRST"), (SL_FIRST, "SL_FIRST"), (NONE, "NONE"), (AMBIGUOUS, "AMBIGUOUS")):
+        sel = e[oc == code]
+        out[f"x_cnt_{name}"] = np.bincount(sel, minlength=n).astype(float)
+        for sc, arr in table.net_by_scenario.items():
+            out[f"x_sum_{name}_{sc}"] = np.bincount(sel, weights=arr[sel], minlength=n)
+    if table.tp_frac is not None:
+        out["tp_frac_sum"] = np.bincount(e, weights=table.tp_frac[e], minlength=n)
+        out["sl_frac_sum"] = np.bincount(e, weights=table.sl_frac[e], minlength=n)
+    out["hold_sum"] = np.bincount(e, weights=table.exit_offset[e].astype(float) + 1.0, minlength=n)
     return out
 
 
@@ -203,7 +216,7 @@ def run_walk_forward(cfg: ResearchConfig, df: pd.DataFrame,
         va = seg["VALIDATION"]
         part = oos_series_arrays(pipe.oos_entries, table, n_bars)
         for k, v in part.items():
-            series[k][va.slice] += v[va.slice]
+            series.setdefault(k, np.zeros(n_bars))[va.slice] += v[va.slice]
         series["covered"][va.slice] = True
         for sc in table.net_by_scenario:
             series[f"base_{sc}"][va.slice] = res.baselines["VALIDATION"].get(f"mean_net_return_{sc}", np.nan)
@@ -253,7 +266,7 @@ def save_walk_forward(wf: WalkForwardResult, output_dir: str | Path) -> Path:
     c = wf.cfg
     stamp = pd.Timestamp.now(tz="UTC").strftime("%Y%m%d_%H%M%S")
     out = Path(output_dir) / (f"wf_{c.ASSET}_{c.TIMEFRAME}_{c.POSITION_TYPE}_seed{c.RANDOM_SEED}"
-                              f"_tp{c.TP_PERCENT:g}_sl{c.SL_PERCENT:g}_h{c.MAX_HOLDING_BARS}_{stamp}")
+                              f"_{exit_tag(c)}_h{c.MAX_HOLDING_BARS}_{stamp}")
     out.mkdir(parents=True, exist_ok=True)
     for i, res in enumerate(wf.folds, 1):
         d = save_results(res, str(out / f"fold_{i}"))

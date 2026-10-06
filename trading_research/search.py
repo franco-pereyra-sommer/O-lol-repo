@@ -84,11 +84,18 @@ class ResearchPipeline:
         # Entradas (vela de entrada) de TODAS las condiciones evaluadas en VALIDATION, para
         # armar la serie OOS del procedimiento (walk_forward.oos_series_arrays).
         self.oos_entries: list[np.ndarray] = []
+        # Señales en t sin ATR disponible en la entrada (t+1) no son operaciones (EXP-010).
+        self.sig_ok = None
+        if self.table.entry_valid is not None:
+            self.sig_ok = np.zeros(len(self.df), bool)
+            self.sig_ok[:-1] = self.table.entry_valid[1:]
 
     # ------------------------------------------------------------------ #
     def evaluate(self, cond: Condition, segment: Segment, stage: str,
                  baseline: dict[str, Any], keep_events: bool = False):
         sig = cond.evaluate(self.store)
+        if self.sig_ok is not None:
+            sig = sig & self.sig_ok
         det = detect_entries(sig, segment, self.cfg.MAX_HOLDING_BARS,
                              self.cfg.MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES,
                              self.cfg.COOLDOWN_MODE, self.table.exit_offset)
@@ -240,12 +247,17 @@ def _json_default(o):
     return str(o)
 
 
+def exit_tag(c) -> str:
+    return (f"atr{c.TP_ATR_MULT:g}x{c.SL_ATR_MULT:g}" if c.EXIT_MODE == "atr"
+            else f"tp{c.TP_PERCENT:g}_sl{c.SL_PERCENT:g}")
+
+
 def save_results(res: SearchResult, output_dir: str | None = None) -> Path:
     base = Path(output_dir or res.cfg.OUTPUT_DIR)
     stamp = pd.Timestamp.now(tz="UTC").strftime("%Y%m%d_%H%M%S")
     c = res.cfg
     out = base / (f"run_{c.ASSET}_{c.TIMEFRAME}_{c.POSITION_TYPE}_seed{c.RANDOM_SEED}"
-                  f"_tp{c.TP_PERCENT:g}_sl{c.SL_PERCENT:g}_h{c.MAX_HOLDING_BARS}_{stamp}")
+                  f"_{exit_tag(c)}_h{c.MAX_HOLDING_BARS}_{stamp}")
     out.mkdir(parents=True, exist_ok=True)
 
     (out / "config.json").write_text(json.dumps(res.cfg.to_dict(), indent=2, default=_json_default))

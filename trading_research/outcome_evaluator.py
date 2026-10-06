@@ -59,6 +59,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 
 from .config import PositionSide, ResearchConfig
 from .costs import EXIT_SL, EXIT_TIME, EXIT_TP, MarketContext, build_cost_model
+from .features import atr_values
 
 log = logging.getLogger(__name__)
 
@@ -80,6 +81,11 @@ class OutcomeTable:
     favorable: dict[str, np.ndarray] = field(default_factory=dict)  # nombre -> bool
     net_by_scenario: dict[str, np.ndarray] = field(default_factory=dict)
     cost_scenario: str = ""
+    # EXP-010: distancias de TP/SL como fracción del precio de entrada (por entrada) y máscara de
+    # entradas válidas (con ATR disponible). En modo "fixed" entry_valid es None (todas válidas).
+    tp_frac: np.ndarray | None = None
+    sl_frac: np.ndarray | None = None
+    entry_valid: np.ndarray | None = None
 
 
 def favorable_name(spec: dict) -> str:
@@ -125,6 +131,31 @@ def apply_costs(entry: np.ndarray, exit_: np.ndarray, cfg: ResearchConfig,
     return exit_ * (1.0 - a) * (1.0 - c) / (entry * (1.0 + a) * (1.0 + c)) - 1.0
 
 
+def atr_at_entry(df: pd.DataFrame, period: int) -> np.ndarray:
+    """ATR conocido al abrir la vela e: el de la vela de confirmación t = e-1 (cierre de t).
+    atr_at_entry[e] = ATR[e-1]; NaN en e = 0 y durante el calentamiento del indicador."""
+    a = atr_values(df, period)
+    out = np.full(len(a), np.nan)
+    out[1:] = a[:-1]
+    return out
+
+
+def atr_exit_levels(df: pd.DataFrame, cfg: ResearchConfig) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Niveles de TP y SL (precios) de una operación que entra en Open[e], para TODA vela e, y si son
+    válidos. Sólo usan Open[e] y ATR[e-1] (información disponible al abrir la operación):
+        LONG : TP = Open[e] + k_tp*ATR[e-1] ; SL = Open[e] - k_sl*ATR[e-1]
+        SHORT: TP = Open[e] - k_tp*ATR[e-1] ; SL = Open[e] + k_sl*ATR[e-1]
+    Inválido (NaN / False) si el ATR no está disponible o el SL de un LONG sería <= 0."""
+    o = df["Open"].to_numpy("float64")
+    a = atr_at_entry(df, cfg.EXIT_ATR_PERIOD)
+    if cfg.POSITION_TYPE == PositionSide.SHORT.value:
+        tp, sl = o - cfg.TP_ATR_MULT * a, o + cfg.SL_ATR_MULT * a
+    else:
+        tp, sl = o + cfg.TP_ATR_MULT * a, o - cfg.SL_ATR_MULT * a
+    valid = np.isfinite(a) & (sl > 0) & (tp > 0)
+    return np.where(valid, tp, np.nan), np.where(valid, sl, np.nan), valid
+
+
 def build_outcome_table(df: pd.DataFrame, cfg: ResearchConfig) -> OutcomeTable:
     side = cfg.POSITION_TYPE
     short = side == PositionSide.SHORT.value
@@ -156,9 +187,16 @@ def build_outcome_table(df: pd.DataFrame, cfg: ResearchConfig) -> OutcomeTable:
     def ret(x):       # retorno bruto de la posición al precio x
         return 1.0 - x / P if short else x / P - 1.0
 
-    tp = P * (1 - cfg.TP_PERCENT) if short else P * (1 + cfg.TP_PERCENT)
-    sl = P * (1 + cfg.SL_PERCENT) if short else P * (1 - cfg.SL_PERCENT)
-    k_tp, k_sl = _first_true(fav_hit(cfg.TP_PERCENT)), _first_true(adv_hit(cfg.SL_PERCENT))
+    if cfg.EXIT_MODE == "atr":
+        atr_e = atr_at_entry(df, cfg.EXIT_ATR_PERIOD)[:m]
+        tp_p = cfg.TP_ATR_MULT * atr_e / P          # distancia relativa por entrada (array)
+        sl_p = cfg.SL_ATR_MULT * atr_e / P
+        valid_m = atr_exit_levels(df, cfg)[2][:m]
+    else:
+        tp_p, sl_p, valid_m = cfg.TP_PERCENT, cfg.SL_PERCENT, None
+    tp = P * (1 - tp_p) if short else P * (1 + tp_p)
+    sl = P * (1 + sl_p) if short else P * (1 - sl_p)
+    k_tp, k_sl = _first_true(fav_hit(tp_p)), _first_true(adv_hit(sl_p))
 
     outcome = np.full(m, NONE, np.int8)
     outcome[k_tp < k_sl] = TP_FIRST
@@ -207,12 +245,21 @@ def build_outcome_table(df: pd.DataFrame, cfg: ResearchConfig) -> OutcomeTable:
     scenarios = list(dict.fromkeys([cfg.COST_SCENARIO, *cfg.COST_SCENARIOS_REPORT]))
     nets = {sc: net_for(sc) for sc in scenarios}
     net = nets[cfg.COST_SCENARIO]
+    if valid_m is not None:                 # sin ATR no hay operación: NaN, nunca un valor "plausible"
+        net = np.where(valid_m, net, np.nan)
+        gross = np.where(valid_m, gross, np.nan)
+        outcome = np.where(valid_m, outcome, -1).astype(np.int8)
     for sc, arr in nets.items():
         full_arr = np.full(n, np.nan)
-        full_arr[:m] = arr
+        full_arr[:m] = arr if valid_m is None else np.where(valid_m, arr, np.nan)
         tbl.net_by_scenario[sc] = full_arr
     tbl.cost_scenario = cfg.COST_SCENARIO
 
+    tbl.tp_frac, tbl.sl_frac = full(), full()
+    tbl.tp_frac[:m], tbl.sl_frac[:m] = tp_p, sl_p
+    if valid_m is not None:
+        tbl.entry_valid = np.zeros(n, bool)
+        tbl.entry_valid[:m] = valid_m
     tbl.entry_price[:m] = P
     tbl.outcome[:m] = outcome
     tbl.exit_offset[:m] = exit_off

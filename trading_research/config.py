@@ -174,6 +174,14 @@ class ResearchConfig:
     # Evaluación posterior a la entrada
     # ------------------------------------------------------------------ #
     MAX_HOLDING_BARS: int = 30
+    # Geometría de la salida (EXP-010). "fixed" (por defecto, el comportamiento de siempre): TP_PERCENT y
+    # SL_PERCENT como fracción del precio de entrada. "atr": TP = entrada ± TP_ATR_MULT * ATR[t] y
+    # SL = entrada ∓ SL_ATR_MULT * ATR[t], con el ATR (Wilder, EXIT_ATR_PERIOD) medido al cierre de la
+    # vela de confirmación t y fijado para toda la operación (entrada = Open[t+1]).
+    EXIT_MODE: str = "fixed"
+    TP_ATR_MULT: float = 2.0
+    SL_ATR_MULT: float = 1.0
+    EXIT_ATR_PERIOD: int = 14
     TP_PERCENT: float = 0.05
     SL_PERCENT: float = 0.02
     # Qué retorno asignar a un caso AMBIGUOUS (TP y SL en la misma vela):
@@ -269,6 +277,11 @@ class ResearchConfig:
 
     # ------------------------------------------------------------------ #
     def validate(self) -> None:
+        if self.EXIT_MODE not in ("fixed", "atr"):
+            raise ValueError("EXIT_MODE debe ser 'fixed' o 'atr'.")
+        if self.EXIT_MODE == "atr" and (self.TP_ATR_MULT <= 0 or self.SL_ATR_MULT <= 0
+                                        or self.EXIT_ATR_PERIOD < 2):
+            raise ValueError("TP_ATR_MULT, SL_ATR_MULT > 0 y EXIT_ATR_PERIOD >= 2.")
         if self.SEARCH_MODE not in ("random", "structured"):
             raise ValueError("SEARCH_MODE debe ser 'random' o 'structured'.")
         if (self.COOLDOWN_MODE == "fixed"
