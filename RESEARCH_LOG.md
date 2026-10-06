@@ -15,12 +15,12 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 ## 0. Estado actual y guía de lectura
 
-*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-05, tras cerrar EXP-009. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
+*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-06, tras cerrar EXP-010. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
 
 ### 0.1 En pocas palabras
 - **Qué se busca:** reglas de entrada (por ejemplo "RSI cruza tal valor y la media corta supera a la larga") que den ganancia **después de costos**, en datos que la regla **no vio** al elegirse, y de forma repetible en distintos períodos del mercado.
 - **Dónde estamos:** con BTCUSDT 1h (2017-2026) **ninguna variante probada gana dinero fuera de muestra** (EXP-001, 002, 005). No hay "candidato" y el tramo final de datos reservado (holdout) **sigue sin abrirse**.
-- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007 (todas terminadas); EXP-008 y EXP-009 usaron esa infraestructura para probar las dos primeras ideas de búsqueda nuevas (más información de contexto; búsqueda estructurada), ambas sin mejora. Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
+- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007 (todas terminadas); EXP-008, EXP-009 y EXP-010 usaron esa infraestructura para probar tres ideas nuevas (más información de contexto; búsqueda estructurada; otra geometría de salida), todas sin mejora. Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
 
 ### 0.2 Experimentos: estado y conclusión (una línea cada uno)
 | Experimento | Qué fue | Estado | Conclusión |
@@ -35,6 +35,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 | EXP-007 | Operaciones superpuestas: qué estadístico es válido y qué cooldown conviene | Cerrado | El t entre operaciones es inútil (bajo ruido "pasa" t ≥ 3 el 24 % de las veces); valen el t entre folds y el HAC. Cooldown estándar: `until_exit`. |
 | EXP-008 | Features de régimen (tendencia 4h, tendencia diaria, volatilidad relativa) vs baseline, misma metodología | Cerrado | **No mejoran la generalización fuera de muestra** (t pareado +1,29 LONG, −1,14 SHORT; Reality Check p ≥ 0,79). Sólo inflan lo "mejor in-sample" (PBO). Resultado negativo registrado. |
 | EXP-009 | Búsqueda estructurada "contexto + disparador" vs búsqueda aleatoria (mismo presupuesto de 7.500 condiciones por fold) | Cerrado | **No es mejor**: t pareado +0,93 (LONG) y +0,30 (SHORT) contra la aleatoria con las mismas features; Reality Check p ≥ 0,87. Opera entre 9 y 16 veces menos, pero el lift por fold no cambia; ningún procedimiento es rentable. |
+| EXP-010 | Salidas TP/SL proporcionales al ATR (4 variantes pre-fijadas) vs TP 5 % / SL 3 %, mismas entradas | Cerrado | **Caso A (negativo)**: ninguna variante mejora al baseline (R1 = NO en las 8; Reality Check p ≥ 0,81). Con cualquier geometría el TP se alcanza con la frecuencia de una caminata sin ventaja y el neto ≈ −costo: el problema no es la salida. H = 100 no resulta corto (NONE ≤ 15 %). |
 
 ### 0.3 Respuestas a las preguntas de revisión
 
@@ -53,15 +54,16 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 **3. Estado del roadmap.**
 - EXP-001/002 están **cerrados y reproducidos** (se repitieron en EXP-005 y dieron los mismos números al dígito).
-- Terminados: EXP-000 a EXP-009 (ver 0.2). En curso: ninguno.
-- **Pendiente de la tabla original** (sección 4, Plan): TP/SL proporcionales al ATR; volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
+- Terminados: EXP-000 a EXP-010 (ver 0.2). En curso: ninguno.
+- **Pendiente de la tabla original** (sección 4, Plan): volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
 - La numeración vieja (EXP-003 = régimen, EXP-004 = contexto+disparador) **ya fue reemplazada** en la sección 4. Las features de régimen (la "EXP-003 original") se probaron en EXP-008 y la estructura "contexto + disparador" (la "EXP-004 original") en EXP-009: ninguna mejoró.
 
 **4. Próximo experimento (propuesta, la decisión es tuya).**
 1. ~~Cerrar EXP-007~~ (hecho: cooldown `until_exit`; deciden el t entre folds y el HAC, nunca el t entre operaciones).
 2. ~~Features de régimen~~ (hecho en EXP-008: no mejoran la generalización; quedan implementadas y apagadas por defecto).
 3. ~~Contexto + disparador~~ (hecho en EXP-009: no mejora; el generador queda implementado y apagado por defecto).
-4. **Lo que sigue lo decidís vos.** Hay 4 experimentos de búsqueda seguidos sin avance (EXP-001, 002, 008, 009; CLAUDE.md pide revisar el rumbo a los 10). Lo único que ninguno cambió es la relación entre el costo (≈ 0,25 % por operación) y el recorrido por operación (TP 5 % / SL 3 % / horizonte 100 velas sobre BTC 1h). Opciones: (a) mover esa relación: TP/SL mayores o proporcionales al ATR, horizontes más largos, temporalidades más lentas; (b) ampliar a otros activos (más historia independiente); (c) más validez estadística (CPCV, PBO sobre el lift); (d) frenar la búsqueda de reglas de entrada y revisar el objetivo del proyecto. Cada una es un experimento separado y suma variantes (K).
+4. ~~TP/SL proporcionales al ATR~~ (hecho en EXP-010: no mejora; el modo `atr` queda implementado y apagado por defecto).
+5. **Lo que sigue lo decidís vos.** Hay 5 experimentos de búsqueda seguidos sin avance (EXP-001, 002, 008, 009, 010; CLAUDE.md pide revisar el rumbo a los 10). EXP-010 aportó la evidencia más clara hasta ahora: con cualquier geometría de salida, las entradas seleccionadas alcanzan el TP con la frecuencia que daría una caminata sin ventaja y el retorno neto es ≈ −(costo por operación). Más información, más estructura y otra salida no cambian eso. Lo que queda cambia el *problema* y no la búsqueda: (a) temporalidades de operación más lentas (4h/1D), donde el recorrido por operación es mucho mayor que el costo; (b) otros activos/mercados (más historia independiente, otra estructura de costos); (c) revisar el objetivo (reglas que no sean sólo de entrada, o estrategias de menor frecuencia); (d) más validez (CPCV, PBO sobre el lift). Cada una es un experimento separado y suma variantes a K.
 - *Decisiones tomadas por Claude que conviene que conozcas y puedas revertir:* (a) se enmendó el criterio de candidato a "t entre folds ≥ 3" (EXP-003); (b) se fijó en 1 % el ATR supuesto en las primeras velas del modelo de slippage (EXP-006); (c) se agregó la regla 7 (Bonferroni con la cuenta K).
 
 ### 0.4 Mini-glosario sin jerga (el glosario técnico está en la sección 1)
@@ -85,7 +87,7 @@ Todo experimento nuevo se evalúa con estas reglas; cambiarlas requiere registra
 - **`n_dropped_horizon` es el mecanismo de purga entre segmentos**: descarta toda señal cuyo horizonte se sale del segmento, de modo que ningún resultado de TRAIN usa precios de VALIDATION. Los tests verifican esa propiedad (`test_trade_label_window_stays_inside_segment`, `test_train_results_do_not_depend_on_future_prices`).
 - **El t entre operaciones es sólo descriptivo; nunca decide.** Decide el **t entre folds** junto con el **t HAC con 3H rezagos (`oos_hac_t_3H`)** (regla 4).
 - Corrección por varias variantes: **regla 7 y definición de K** (sección 2, "Aclaración de la regla 7 y definición de K"). Una sola corrección por familia (Reality Check *o* Bonferroni, no ambas).
-- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 4.291.500 al cierre de EXP-009. K (variantes en el Reality Check) = 8.
+- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 9.691.500 al cierre de EXP-010. K (variantes en el Reality Check) = 16.
 - Toda feature nueva: test de causalidad por truncación/perturbación del futuro y `run_lookahead.py` (EXP-006).
 
 ---
@@ -226,9 +228,9 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
 | Concepto | Valor actual | ¿Entra en K? | Motivo |
 |---|---|---|---|
 | Condiciones individuales generadas | 7.500 por fold y lado | **No** | Se eligen con TRAIN y se miden en VALIDATION sin seleccionar por VALIDATION: la selección ya quedó dentro del procedimiento (EXP-003/004). |
-| Variantes / configuraciones (procedimientos completos) | 8 al cierre de EXP-009 (EXP-001, EXP-002, EXP-008-régimen y EXP-009-estructurada, cada uno LONG/SHORT; eran 4 antes de EXP-008 y 6 antes de EXP-009) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
-| Experimentos | 10 (EXP-000 a EXP-009) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
-| Hipótesis acumuladas | 4.291.500 (al cierre de EXP-009) | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
+| Variantes / configuraciones (procedimientos completos) | 16 al cierre de EXP-010 (EXP-001, EXP-002, EXP-008-régimen, EXP-009-estructurada y las cuatro variantes ATR de EXP-010, cada una LONG/SHORT; eran 4 antes de EXP-008, 6 antes de EXP-009 y 8 antes de EXP-010) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
+| Experimentos | 11 (EXP-000 a EXP-010) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
+| Hipótesis acumuladas | 9.691.500 (al cierre de EXP-010) | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
 | Universo conjunto del Reality Check | las K variantes con series OOS alineables | **Define K** | K = tamaño de ese universo. |
 Pertenece al universo de una variante si: (i) mismo activo, datos y timeframe; (ii) su serie OOS puede alinearse con las demás en la historia común (se usa la intersección); (iii) el investigador podría haber reportado esa variante como "el resultado". Si alguna de las tres no está clara, **no se decide arbitrariamente**: se documenta la duda en la entrada del experimento y se informa el Reality Check con y sin esa variante. Cada variante de una ablación (quitar una feature) cuenta si se mira su resultado OOS.
 
@@ -619,7 +621,7 @@ Walk-forward de 90 folds, costos `typical` salvo donde se indica. A0 = aleatoria
 **Decisión.** (1) El generador estructurado queda implementado y probado (`SEARCH_MODE="structured"`, apagado por defecto); no se sigue refinando triggers para "hacerlo funcionar" (cada cambio sería una variante nueva que sube K y las hipótesis). (2) Holdout cerrado; sin candidato. (3) Experimentos de búsqueda seguidos sin avance: **4** (EXP-001, 002, 008, 009); el umbral de CLAUDE.md para revisar el rumbo es 10, pero el patrón es consistente en los cuatro: ningún procedimiento supera el costo, y ni más features ni más estructura cambian eso. La explicación más simple, compatible con todos los resultados, es que **el costo (≈ 0,25 % por operación) es del mismo orden que cualquier efecto detectable con TP 5 % / SL 3 % y condiciones sobre BTC 1h**.
 **Próximo paso (a decidir con el usuario).** Con la variable "forma de buscar" y la variable "información de contexto" ya exploradas sin resultado, la palanca que queda es la **relación costo/ganancia**: TP/SL mayores o proporcionales al ATR, horizontes más largos y/o temporalidades más lentas (menos operaciones y más recorrido por operación frente a un costo casi fijo). También: abrir la discusión sobre si la búsqueda de reglas de entrada sobre una sola serie (BTC 1h) tiene salida, o si conviene ampliar a otros activos. No se avanza con ATR, volumen ni otras features hasta que se decida.
 
-### EXP-010 — Salidas TP/SL proporcionales al ATR vs TP/SL fijos [EN CURSO] (2026-10-06)
+### EXP-010 — Salidas TP/SL proporcionales al ATR vs TP/SL fijos (2026-10-06)
 **Contexto.** Cuatro experimentos de búsqueda (EXP-001, 002, 008, 009) no dieron rentabilidad OOS defendible con la geometría de salida fija TP 5 % / SL 3 % / H 100 sobre BTCUSDT 1h con costos `typical`. Esos experimentos cambiaron el espacio de entradas y la forma de buscar; nunca la geometría de salida.
 **Hipótesis H1 (del usuario).** Adaptar TP y SL a la volatilidad contemporánea mediante ATR puede mejorar el retorno OOS y/o la estabilidad entre folds respecto de los exits fijos actuales. H1 no afirma que ATR produzca una estrategia rentable: pregunta si cambiar la escala de las operaciones elimina parte del problema observado.
 **Restricción metodológica.** Sólo cambia la geometría de la salida. Mismo generador de entradas, presupuesto, features, profundidad, semilla, folds, filtros, `until_exit`, costos, ambigüedad, horizonte y datos que el baseline; sin features, operadores, activos ni temporalidades nuevas; holdout cerrado.
@@ -644,6 +646,58 @@ Sólo dependen de Open[e] y de datos hasta t. La resolución de la operación (q
 **Orden de ejecución (fijado).** (1) Tests: 75 pasan (13 nuevos en `tests/test_atr_exits.py`: causalidad del ATR por truncación y por recálculo sin datos posteriores a t; truncación y perturbación del futuro sobre los niveles (LONG y SHORT) con un canario que mira t+1 y se detecta; fórmula de niveles LONG/SHORT; niveles fijados al entrar y salidas exactamente en ellos; calentamiento (sin ATR → entrada inválida, NaN, excluida de señales y línea base); ambigüedad TP/SL en la misma vela con política conservadora; invariancia ante datos posteriores a la operación; baseline fijo con números dorados; consistencia del desglose por motivo de salida). (2) `run_lookahead.py --exit-mode atr` para los cuatro pares de múltiplos. (3) Recién después el walk-forward (B0 + V1–V4). No se miran resultados parciales para cambiar la metodología.
 **Comandos.** Base: `pixi run python run_research.py --csv "D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv" --walk-forward --wf-train-bars 2500 --wf-val-bars 720 --side LONG SHORT --horizon 100 --cooldown-mode until_exit --filter-mode both --cost-scenario typical --no-events`; B0: `--tp 0.05 --sl 0.03 --output results/exp010/b0`; variantes: `--exit-mode atr --tp-atr K --sl-atr K --output results/exp010/vN`. Comparación: `run_atr_comparison.py`.
 
+**Resultados (2026-10-06).** *Regresión:* B0 re-corrida con el código nuevo reproduce **idénticas** (20 columnas numéricas de `wf_summary.csv`, diferencia máxima 0) las corridas de EXP-002 para LONG y SHORT: el cambio de código no alteró el baseline. *Look-ahead* (antes del WFO): 0 cambios en 588 operandos, 1.000 señales, 100 + 100 chequeos de entradas y en los niveles de TP/SL, para cada uno de los 4 pares de múltiplos y para LONG y SHORT.
+
+90 folds, costos `typical` salvo donde se indica (B0 = TP 5 % / SL 3 %; V1–V4 con salidas por ATR; H = 100 en todas):
+
+| | Neto OOS agrupado | Ídem `conservative` | Media por fold del neto | Media por fold del lift | t folds neto | t folds lift | `oos_hac_t_3H` neto | Folds neto > 0 | Folds > base | Operaciones OOS |
+|---|---|---|---|---|---|---|---|---|---|---|
+| B0 LONG | −0,191 % | −0,344 % | −0,154 % | +0,053 % | −1,56 | +1,13 | −1,99 | 39/89 | 52 | 895.090 |
+| V1 2/1 LONG | −0,250 % | −0,408 % | −0,222 % | +0,057 % | **−10,40** | **+3,69** | −9,28 | 15/89 | 56 | 463.501 |
+| V2 3/1 LONG | −0,261 % | −0,412 % | −0,217 % | +0,065 % | −7,80 | +3,99 | −7,48 | 18/89 | 61 | 711.920 |
+| V3 3/2 LONG | −0,273 % | −0,408 % | −0,192 % | +0,075 % | −3,50 | +2,81 | −3,91 | 30/90 | 56 | 1.049.487 |
+| V4 4/2 LONG | −0,241 % | −0,381 % | −0,218 % | +0,069 % | −2,86 | +1,87 | −3,36 | 33/89 | 55 | 1.015.441 |
+| B0 SHORT | −0,146 % | −0,296 % | −0,184 % | −0,020 % | −1,89 | −0,43 | −0,89 | 37/74 | 31 | 492.594 |
+| V1 2/1 SHORT | −0,255 % | −0,396 % | −0,255 % | +0,008 % | **−11,90** | +0,45 | −9,25 | 3/89 | 50 | 504.128 |
+| V2 3/1 SHORT | −0,277 % | −0,423 % | −0,308 % | −0,018 % | −10,65 | −0,81 | −7,26 | 13/89 | 44 | 611.678 |
+| V3 3/2 SHORT | −0,259 % | −0,387 % | −0,254 % | +0,022 % | −4,07 | +0,64 | −3,60 | 28/87 | 50 | 660.769 |
+| V4 4/2 SHORT | −0,287 % | −0,417 % | −0,238 % | +0,042 % | −3,29 | +1,28 | −3,27 | 30/87 | 52 | 632.026 |
+
+**Comparación pareada (variante − B0, mismos folds; R1 exige t ≥ 2,55, HAC ≥ 2 y t pareado en `conservative` ≥ 2):** todas las diferencias medias por fold son ≤ 0 salvo V3 SHORT (+0,002 %) y V4 SHORT (+0,023 %); t pareados entre −0,97 y +0,32; t HAC de la diferencia entre −2,31 y −0,41; bootstrap P(variante > B0) entre 0,67 y 0,99. **R1 = NO en las 8 (variante, lado).** Detalle: V1 L −0,068 % (t −0,76), V1 S −0,051 % (−0,58), V2 L −0,063 % (−0,76), V2 S −0,071 % (−0,89), V3 L −0,037 % (−0,53), V3 S +0,002 % (+0,03), V4 L −0,061 % (−0,97), V4 S +0,023 % (+0,32).
+**R2:** ninguna variante tiene retorno neto OOS agrupado > 0 (ni en `typical` ni en `conservative`); t entre folds de neto entre −2,86 y −11,90.
+**Reality Check, K = 16 (T = 52.240):** benchmark cero, `typical`: p = 1,000 (mejor B0 SHORT); `conservative`: 1,000; exceso sobre la línea base, `typical`: p = 0,812 (mejor V1 LONG, p individual 0,21); `conservative`: 0,849. Ninguna variante V tiene p individual < 0,2.
+
+**Motivo de salida de las operaciones OOS** (todas las condiciones seleccionadas; porcentaje de las operaciones; retorno neto medio por operación; entre paréntesis la contribución al retorno medio por operación, que suma el neto agrupado):
+
+| | TP_FIRST | SL_FIRST | NONE | AMBIGUOUS | TP / SL medios (% del precio) | Duración media (velas) |
+|---|---|---|---|---|---|---|
+| B0 LONG | 32,4 % · +4,76 % (+1,55) | 55,6 % · −3,24 % (−1,80) | 11,8 % · +0,60 % (+0,07) | 0,1 % | 5,00 / 3,00 | 37,6 |
+| B0 SHORT | 31,9 % · +4,78 % (+1,52) | 52,7 % · −3,26 % (−1,71) | 15,4 % · +0,31 % (+0,05) | 0,1 % | 5,00 / 3,00 | 41,4 |
+| V1 LONG | 32,8 % · +2,47 % (+0,81) | 66,7 % · −1,58 % (−1,06) | 0,0 % | 0,4 % | 2,68 / 1,34 | 7,2 |
+| V1 SHORT | 33,5 % · +1,96 % (+0,66) | 65,8 % · −1,37 % (−0,90) | 0,0 % | 0,7 % | 2,22 / 1,11 | 7,4 |
+| V2 LONG | 24,9 % · +3,25 % (+0,81) | 74,7 % · −1,44 % (−1,07) | 0,2 % | 0,2 % | 3,55 / 1,18 | 10,4 |
+| V2 SHORT | 24,9 % · +2,96 % (+0,74) | 74,7 % · −1,35 % (−1,01) | 0,1 % | 0,3 % | 3,27 / 1,09 | 10,4 |
+| V3 LONG | 39,3 % · +3,05 % (+1,20) | 58,9 % · −2,53 % (−1,49) | 1,5 % · +1,46 % | 0,2 % | 3,40 / 2,27 | 20,0 |
+| V3 SHORT | 39,9 % · +2,77 % (+1,10) | 58,8 % · −2,31 % (−1,36) | 1,2 % | 0,1 % | 3,07 / 2,04 | 20,0 |
+| V4 LONG | 32,2 % · +4,07 % (+1,31) | 64,1 % · −2,51 % (−1,61) | 3,7 % · +1,65 % (+0,06) | 0,1 % | 4,53 / 2,26 | 25,1 |
+| V4 SHORT | 31,8 % · +3,57 % (+1,14) | 64,6 % · −2,22 % (−1,43) | 3,4 % · +0,37 % (+0,01) | 0,1 % | 3,92 / 1,96 | 25,1 |
+
+**Lectura (las 9 preguntas del usuario).**
+1. *¿ATR mejora respecto de TP 5 % / SL 3 %?* **No.** En el retorno neto OOS ninguna variante mejora de forma defendible (R1 = NO en las 8); en el agregado las 8 son *peores* que B0 salvo, apenas, V3 SHORT y V4 SHORT por fold (+0,002 % y +0,023 %, t 0,03 y 0,32), y en el retorno agrupado todas lo son (−0,24 a −0,29 % vs −0,19 y −0,15 %).
+2. *¿Consistente entre folds?* No hay mejora; lo consistente es la pérdida: V1 y V2 pierden en 71–86 de 89 folds (V1 SHORT gana en 3/89), con t entre folds de −7,8 a −11,9 (pérdidas "significativas"); V3 y V4, de −2,9 a −4,1.
+3. *¿Sobrevive HAC/bootstrap?* No hay mejora que verificar: el HAC de la diferencia es ≤ 0 en las 8 y el bootstrap da P(variante > B0) entre 0,67 y 0,99 (a favor de B0).
+4. *¿Sobrevive costos conservadores?* Tampoco: con `conservative` ninguna diferencia es significativa (t pareado −0,82 a +0,49) y los retornos agrupados son −0,38 a −0,42 %.
+5. *Motivo de salida:* ver tabla. AMBIGUOUS es ≤ 0,7 % en todo; TP_FIRST 25–40 %; SL_FIRST 53–75 %; **NONE** 11,8 % / 15,4 % en B0 y 0,0–3,7 % en las variantes ATR.
+6. *¿H = 100 es demasiado corto?* **No hay evidencia de eso.** NONE no llega al umbral fijado (20 %) en ninguna variante; la duración media es de 38–41 velas en B0 y de 7–25 en las ATR; H = 100 casi nunca es el factor que cierra la operación. Si algo, es largo para las geometrías ATR de 1–2 ATR. No se justifica un experimento de horizonte por este motivo.
+7. *¿Cambia materialmente la relación riesgo/beneficio?* En lo realizado, sí, pero sin efecto en el resultado: cociente entre ganancia media en TP y pérdida media en SL: B0 1,47; V1 1,56 (LONG) y 1,42 (SHORT); V2 2,26 y 2,19; V3 1,21 y 1,20; V4 1,62 y 1,61; y las distancias medias de TP/SL pasan de 5,0 / 3,0 % a 2,2–4,5 / 1,1–2,3 %. Pero la frecuencia de TP entre las operaciones resueltas (TP ÷ (TP + SL)) coincide casi exactamente con la de una caminata sin ventaja, SL ÷ (TP + SL) en términos de distancias: B0 36,8 % LONG y 37,7 % SHORT frente a 37,5 % teórico; V1 33,0 % y 33,8 % (33,3 %); V2 25,0 % y 25,0 % (25,0 %); V3 40,0 % y 40,4 % (40,0 %); V4 33,4 % y 33,0 % (33,3 %). Es decir: con cualquier geometría, las condiciones seleccionadas en TRAIN aciertan el TP con la frecuencia que daría una caminata sin ventaja; y el retorno neto agrupado de las variantes ATR (−0,24 a −0,29 %) es prácticamente igual al costo de ida y vuelta (≈ 0,22–0,26 %): retorno bruto ≈ 0 menos costo.
+8. *¿El problema es la geometría de salida y no la búsqueda de entradas?* **La evidencia apunta a lo contrario.** Cambiar la escala de la salida cinco veces (B0, V1–V4) no mueve el retorno bruto de cero. Con las entradas seleccionadas, el TP se alcanza con la frecuencia de una caminata sin ventaja, de modo que lo que falta no es una mejor salida sino información en la entrada capaz de superar el costo. Una observación honesta que no cambia la conclusión: en LONG, V1–V3 tienen un t entre folds del lift sobre *su propia* línea base de +3,7, +4,0 y +2,8 (B0: +1,1), con el mismo lift medio (+0,06 a +0,08 % por fold vs +0,05 %) pero menos dispersión entre folds; es decir, la normalización por ATR hace *más estable* la medición del pequeño lift que ya existía (lo que H1 anticipaba como "estabilidad"), pero ese lift es unas cuatro veces menor que el costo por operación, el HAC del lift no lo confirma (0,2 a 0,7: según la regla de EXP-007 queda "no confirmado") y las diferencias pareadas contra B0 no son significativas.
+9. *¿Alguna variante justifica detenerse y reconsiderar el holdout?* **No.** Caso **A (negativo)**: ninguna variante mejora de manera estadísticamente defendible al baseline; ninguna tiene retorno neto OOS > 0.
+
+**Conclusión.** Adaptar TP/SL a la volatilidad mediante ATR (con estos cuatro pares de múltiplos y H = 100) no resuelve el problema observado. Hipótesis H1 no se sostiene en su parte de retorno; en su parte de estabilidad hay un efecto marginal sobre la dispersión del lift entre folds, sin consecuencia sobre la rentabilidad.
+**Cuentas.** Hipótesis de este experimento: **5.400.000** (V1–V4: 7.500 × 90 folds × 2 lados × 4); B0 repetida: 0 nuevas; **acumulado 9.691.500**. **K = 16** desde este experimento (V1–V4 × LONG/SHORT). Las 8 comparaciones pareadas contra B0 se corrigieron por Bonferroni (t ≥ 2,55) y no suman a K. PBO no se corrió (como se pre-especificó). Holdout cerrado.
+**Decisión.** (1) Las salidas por ATR quedan implementadas y probadas (`EXIT_MODE="atr"`, apagadas por defecto; el modo fijo es numéricamente idéntico a antes). (2) No se encadena ningún experimento (ni ATR + indicador, ni nuevo horizonte, ni nuevo activo). (3) Experimentos de búsqueda seguidos sin avance: **5** (EXP-001, 002, 008, 009, 010; CLAUDE.md pide revisar el rumbo a los 10).
+**Próximo paso (a decidir con el usuario, después de leer esta conclusión).** Con entradas simples sobre BTC 1h, ni más información (EXP-008), ni más estructura (EXP-009), ni otra geometría de salida (EXP-010) superan un costo de ≈ 0,25 % por operación: en todas las geometrías la tasa de acierto es la de una caminata sin ventaja. Lo que queda por probar cambia el *problema* y no la búsqueda: (a) temporalidades más lentas (4h/1D como temporalidad de operación), donde el movimiento por operación es mucho mayor que el costo; (b) otros activos u otros mercados (más historia independiente, otra estructura de costos); (c) revisar el objetivo (por ejemplo, reglas que no sean sólo de entrada: tamaño/gestión, o estrategias de menor frecuencia); (d) más validez (CPCV, PBO sobre el lift). Cada una es un experimento separado y suma variantes a K.
+
 ---
 
 ## 4. Plan
@@ -658,7 +712,7 @@ Siguiente (alta prioridad, completa la línea de validez):
 Hoja de ruta original, conservada:
 4. ~~Features de régimen: tendencia en temporalidades mayores (4h, diario) y volatilidad relativa~~ (hecho en EXP-008: sin mejora OOS).
 5. ~~Condiciones con lógica "contexto + disparador" y búsqueda por estados/eventos (idea B)~~ (hecho en EXP-009: sin mejora OOS; breakout queda como variante futura por requerir un operando nuevo).
-6. TP/SL proporcionales al ATR.
+6. ~~TP/SL proporcionales al ATR~~ (hecho en EXP-010: sin mejora; el horizonte H = 100 no resultó corto, NONE ≤ 15 %).
 7. Volumen y hora del día / día de la semana; otras features.
 8. Periodicidad de re-search/retraining (ampliar EXP-002).
 9. Modelos de costo dependientes de tamaño/precio; spread/slippage dinámicos.
