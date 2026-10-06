@@ -53,6 +53,8 @@ def main() -> None:
     p.add_argument("--timeframe", default="1h")
     p.add_argument("--csv-timeframe", default="")
     p.add_argument("--exit-mode", choices=("fixed", "atr"), default="fixed")
+    p.add_argument("--tp", type=float, default=None, help="TP fijo (fracción) para el chequeo de entradas.")
+    p.add_argument("--sl", type=float, default=None, help="SL fijo (fracción) para el chequeo de entradas.")
     p.add_argument("--tp-atr", type=float, default=2.0)
     p.add_argument("--sl-atr", type=float, default=1.0)
     p.add_argument("--search-mode", choices=("random", "structured"), default="random")
@@ -97,9 +99,10 @@ def main() -> None:
 
     sub = conds[:: max(1, len(conds) // a.n_entry_conds)][: a.n_entry_conds]
     for mode, cd in (("until_exit", 1), ("fixed", 15)):
+        xkw = {k: v for k, v in (("TP_PERCENT", a.tp), ("SL_PERCENT", a.sl)) if v is not None}
         cfg = ResearchConfig(MAX_HOLDING_BARS=a.horizon, COOLDOWN_MODE=mode,
                              MIN_BARS_BETWEEN_SAME_CONDITION_ENTRIES=cd, EXIT_MODE=a.exit_mode,
-                             TP_ATR_MULT=a.tp_atr, SL_ATR_MULT=a.sl_atr)
+                             TP_ATR_MULT=a.tp_atr, SL_ATR_MULT=a.sl_atr, **xkw)
         fns = {c.key: (lambda d, c=c: c.evaluate(FeatureStore(d))) for c in sub}
         f_ent = check_entries(df, fns, cfg, ks)
         bad = {k: v for k, v in f_ent.items() if v}

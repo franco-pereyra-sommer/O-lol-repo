@@ -115,7 +115,8 @@ def pooled_t(df: pd.DataFrame, col: str = "mean_net_return") -> float:
     return float(mu / np.sqrt(var / N)) if var > 0 else float("nan")
 
 
-def oos_series_arrays(entry_lists: list[np.ndarray], table: OutcomeTable, n: int) -> dict[str, np.ndarray]:
+def oos_series_arrays(entry_lists: list[np.ndarray], table: OutcomeTable, n: int,
+                      horizon: int | None = None) -> dict[str, np.ndarray]:
     """Serie OOS por vela de UN fold, a partir de las entradas de todas las condiciones
     seleccionadas en su TRAIN y evaluadas en su VALIDATION. Para cada vela de entrada:
       cnt        cantidad de operaciones abiertas en esa vela (todas las condiciones)
@@ -141,6 +142,9 @@ def oos_series_arrays(entry_lists: list[np.ndarray], table: OutcomeTable, n: int
     # Retorno bruto (antes de costos) por vela de entrada (EXP-011): costo = bruto - neto.
     g = np.nan_to_num(table.gross_return[e])
     out["gross_sum"] = np.bincount(e, weights=g, minlength=n)
+    out["sum_gross"] = out["gross_sum"]          # alias: `procedure_series(z, "gross")` (EXP-012)
+    if horizon is not None:                      # histograma de duraciones (1..H barras), para la mediana
+        out["hold_hist"] = np.bincount(table.exit_offset[e].astype(np.int64) + 1, minlength=horizon + 1).astype(float)
     return out
 
 
@@ -201,6 +205,8 @@ def run_walk_forward(cfg: ResearchConfig, df: pd.DataFrame,
     results, rows = [], []
     n_bars = len(df)
     series = {"covered": np.zeros(n_bars, dtype=bool), "cnt": np.zeros(n_bars)}
+    series["base_gross"] = np.full(n_bars, np.nan)
+    series["hold_hist"] = np.zeros(cfg.MAX_HOLDING_BARS + 1)
     for sc in table.net_by_scenario:
         series[f"sum_{sc}"] = np.zeros(n_bars)
         series[f"base_{sc}"] = np.full(n_bars, np.nan)
@@ -217,9 +223,13 @@ def run_walk_forward(cfg: ResearchConfig, df: pd.DataFrame,
         pipe = ResearchPipeline(fcfg, df=df, store=store, segments=segs, table=table)
         res = pipe.run()
         va = seg["VALIDATION"]
-        part = oos_series_arrays(pipe.oos_entries, table, n_bars)
+        part = oos_series_arrays(pipe.oos_entries, table, n_bars, cfg.MAX_HOLDING_BARS)
         for k, v in part.items():
+            if k == "hold_hist":
+                series[k] += v
+                continue
             series.setdefault(k, np.zeros(n_bars))[va.slice] += v[va.slice]
+        series["base_gross"][va.slice] = res.baselines["VALIDATION"].get("mean_gross_return", np.nan)
         series["covered"][va.slice] = True
         for sc in table.net_by_scenario:
             series[f"base_{sc}"][va.slice] = res.baselines["VALIDATION"].get(f"mean_net_return_{sc}", np.nan)
