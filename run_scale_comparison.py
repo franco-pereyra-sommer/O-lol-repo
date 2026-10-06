@@ -39,6 +39,11 @@ def t_stat(x) -> float:
     return float(x.mean() / (x.std(ddof=1) / np.sqrt(len(x)))) if len(x) > 2 and x.std(ddof=1) > 0 else float("nan")
 
 
+def is_empty(summ: pd.DataFrame) -> bool:
+    """Variante/lado sin ninguna operación OOS (ninguna condición seleccionada en ningún fold)."""
+    return int(summ["oos_entries"].sum()) == 0
+
+
 def fold_blocks(idx: pd.DatetimeIndex, summ: pd.DataFrame) -> list[np.ndarray]:
     f = fold_of_bars(idx, summ)
     return [np.flatnonzero(f == i) for i in range(len(summ))]
@@ -112,6 +117,10 @@ def main() -> None:
         H, k = VAR[nm]
         fs = FS[(nm, s)]
         cov = z["covered"]
+        if is_empty(summ):
+            rows[f"{nm}|{s}"] = {"folds": int(len(summ)), "folds_with_trades": 0, "oos_entries": 0,
+                                 "selected_in_train_total": int(summ["selected_in_train"].sum()), "empty": True}
+            continue
         m = side_metrics(summ, ag, z, h=H)
         g_ser, gl_ser = procedure_series(z, "gross")[cov], procedure_series(z, "gross", "lift")[cov]
         n_ser = procedure_series(z, "typical")[cov]
@@ -135,7 +144,10 @@ def main() -> None:
             "t_folds_gross", "t_folds_net", "t_folds_gross_lift", "t_folds_net_lift", "hac_gross", "hac_t_3H_net",
             "hac_gross_lift", "hac_t_3H_lift", "folds_net_gt0", "folds_beat_base", "tp_share_pooled", "tp_lift_mean",
             "t_folds_tp_lift", "tp_share_vs_375_t_folds"]
-    print(pd.DataFrame({k: {m: v[m] for m in keys} for k, v in rows.items()}).to_string(float_format=lambda v: f"{v:.5f}"))
+    print(pd.DataFrame({k: {m: v.get(m, np.nan) for m in keys} for k, v in rows.items()}).to_string(float_format=lambda v: f"{v:.5f}"))
+    fw = {k: (int(runs[(k.split("|")[0], k.split("|")[1])][0]["selected_in_train"].gt(0).sum()), v["folds"]) for k, v in rows.items()}
+    print("Folds con al menos una condición seleccionada en TRAIN (de los folds totales):", fw)
+    out["folds_with_selection"] = fw
 
     # ------------------------------------------------------------------ economía y operaciones
     print("\nOperaciones, duración y economía (por operación y por condición seleccionada y ventana de 30 días)")
@@ -143,6 +155,8 @@ def main() -> None:
     for (nm, s), (summ, ag, z) in runs.items():
         H, k = VAR[nm]
         cov = z["covered"]
+        if is_empty(summ):
+            continue
         n = float(z["cnt"][cov].sum())
         nf = int((summ["selected_in_train"] > 0).sum())
         pc = {key: float(per_condition_series(z, summ, idx, key).sum()) / nf / k
@@ -165,6 +179,7 @@ def main() -> None:
           "pooled_trades_per_year", "duration_mean_h", "duration_median_h", "gross_per_trade", "cost_per_trade", "net_per_trade",
           "net_per_trade_cons", "gross_30d", "cost_30d", "net_30d", "net_30d_cons"]
     print(pd.DataFrame({k: {m: v[m] for m in ek} for k, v in econ.items()}).to_string(float_format=lambda v: f"{v:.5f}"))
+    print("  (sin operaciones OOS, omitidos: " + ", ".join(k for k, v in rows.items() if v.get("empty")) + ")")
     print("\nMotivo de salida (typical): % de operaciones · retorno medio · contribución al retorno medio por operación")
     for k, v in econ.items():
         ex = v["exits"]
@@ -179,6 +194,9 @@ def main() -> None:
         for s in SIDES:
             sk, _, zk = runs[(nm, s)]
             zb = runs[("B0", s)][2]
+            if is_empty(sk):
+                print(f"  {nm} {s:<5}: sin operaciones OOS (ninguna condición seleccionada en TRAIN): comparación imposible")
+                continue
             common = zk["covered"] & zb["covered"]
             blocks = [b[common[b]] for b in fold_blocks(idx, sk)]
 
@@ -299,6 +317,9 @@ def main() -> None:
     for nm in ("V1", "V2", "V3"):
         for s in SIDES:
             m = rows[f"{nm}|{s}"]
+            if m.get("empty") or f"{nm}|{s}" not in out["paired"]:
+                ev[(nm, s)] = {k_: False for k_ in ("P1", "P2", "P3", "P4", "P5")}
+                continue
             pr = out["paired"][f"{nm}|{s}"]
             P1 = m["mean_fold_gross_lift"] > 0 and m["t_folds_gross_lift"] >= thr_abs[nm]
             P2 = m["hac_gross_lift"] >= 2
@@ -313,6 +334,11 @@ def main() -> None:
         for nm in ("V1", "V2", "V3"):
             e = ev[(nm, s)]
             m = rows[f"{nm}|{s}"]
+            if m.get("empty") or f"{nm}|{s}" not in out["paired"]:
+                e.update({"P6": bool(p6), "C": False, "D": False, "B": False, "empty": True})
+                out["rules"][f"{nm}|{s}"] = e
+                print(f"  {nm} {s:<5}: sin operaciones OOS -> ninguna regla evaluable (A)")
+                continue
             pr = out["paired"][f"{nm}|{s}"]
             C = bool(all(e[p] for p in ("P1", "P2", "P3", "P4", "P5")) and p6)
             D = bool(C and m["oos_pooled_mean_net"] > 0 and m["oos_pooled_mean_net_conservative"] > 0 and m["oos_entries"] >= 100
