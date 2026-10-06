@@ -52,6 +52,8 @@ def parse_args() -> argparse.Namespace:
     g.add_argument("--csv", help="Usar un CSV OHLC en lugar de yfinance.")
     g.add_argument("--asset", default=d.ASSET)
     g.add_argument("--timeframe", default=d.TIMEFRAME)
+    g.add_argument("--csv-timeframe", default=d.CSV_TIMEFRAME,
+                   help="Temporalidad del CSV si es más fina que --timeframe (se agrega de forma estricta, EXP-011).")
     g.add_argument("--train", type=float, default=d.TRAIN_FRACTION, help="Fracción TRAIN.")
     g.add_argument("--val", type=float, default=d.VALIDATION_FRACTION,
                    help="Fracción VALIDATION (TEST = el resto).")
@@ -137,7 +139,7 @@ def parse_args() -> argparse.Namespace:
 
 def base_config(a: argparse.Namespace) -> ResearchConfig:
     cfg = ResearchConfig(
-        ASSET=a.asset, TIMEFRAME=a.timeframe,
+        ASSET=a.asset, TIMEFRAME=a.timeframe, CSV_TIMEFRAME=a.csv_timeframe,
         TRAIN_FRACTION=a.train, VALIDATION_FRACTION=a.val,
         TEST_FRACTION=round(1.0 - a.train - a.val, 10),
         RANDOM_SEED=a.seed, MAX_CONDITION_DEPTH=a.depth, REGIME_FEATURES=a.regime_features, SEARCH_MODE=a.search_mode,

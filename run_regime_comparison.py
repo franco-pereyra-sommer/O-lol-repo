@@ -38,7 +38,7 @@ def load(path: Path):
     return s, ag, {k: z[k] for k in z.files}
 
 
-def side_metrics(s: pd.DataFrame, ag: dict, z: dict, scenario: str = "typical") -> dict:
+def side_metrics(s: pd.DataFrame, ag: dict, z: dict, scenario: str = "typical", h: int = H) -> dict:
     cov = z["covered"]
     x = procedure_series(z, scenario)[cov]
     xl = procedure_series(z, scenario, "lift")[cov]
@@ -52,7 +52,7 @@ def side_metrics(s: pd.DataFrame, ag: dict, z: dict, scenario: str = "typical") 
         "mean_fold_net": float(net.mean()), "mean_fold_lift": float(lift.mean()),
         "t_folds_net": fold_level_t(s, "oos_pooled_mean_net"),
         "t_folds_lift": fold_level_t(s, "oos_pooled_lift_net"),
-        "hac_t_3H_net": newey_west_t(x, 3 * H), "hac_t_3H_lift": newey_west_t(xl, 3 * H),
+        "hac_t_3H_net": newey_west_t(x, 3 * h), "hac_t_3H_lift": newey_west_t(xl, 3 * h),
         "folds_net_gt0": int((net > 0).sum()), "folds_beat_base": int((lift > 0).sum()),
         "folds_net_gt0_conservative": int((cons > 0).sum()),
         "oos_entries": int(s["oos_entries"].sum()),

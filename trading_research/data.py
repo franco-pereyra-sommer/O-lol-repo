@@ -160,5 +160,9 @@ def make_data_source(cfg: ResearchConfig) -> DataSource:
 
 def load_data(cfg: ResearchConfig) -> pd.DataFrame:
     df = make_data_source(cfg).fetch(cfg.ASSET, cfg.TIMEFRAME)
+    if cfg.CSV_TIMEFRAME and cfg.CSV_TIMEFRAME != cfg.TIMEFRAME:
+        from .resample import aggregate_ohlc_strict
+        df, rep = aggregate_ohlc_strict(df, cfg.TIMEFRAME, cfg.CSV_TIMEFRAME)
+        log.info("Agregado %s -> %s: %s", cfg.CSV_TIMEFRAME, cfg.TIMEFRAME, rep)
     log.info("Datos: %s", quality_report(df, cfg.TIMEFRAME))
     return df

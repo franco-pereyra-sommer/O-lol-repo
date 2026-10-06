@@ -157,6 +157,97 @@ def check_exit_levels(df: pd.DataFrame, cfg: ResearchConfig, ks: list[int],
     return fails
 
 
+def _strict_agg(df1h: pd.DataFrame) -> pd.DataFrame:
+    from .resample import aggregate_ohlc_strict
+    return aggregate_ohlc_strict(df1h, "4h", "1h")[0]
+
+
+def check_resample_causality(df1h: pd.DataFrame, conds: list[Condition], positions: list[int],
+                             rng: np.random.Generator, aggregate=_strict_agg,
+                             cfg: ResearchConfig | None = None) -> dict[str, int]:
+    """EXP-011: causalidad de la construcción de velas superiores (4h) desde las de 1h.
+    Para cada posición p (fila de 1h) se modifican datos 1h en cuatro situaciones y se exige que
+    NADA anterior a la disponibilidad de esos datos cambie (filas 4h con índice < inicio del bloque
+    modificado: OHLC, señales de las condiciones y entradas confirmadas, con su precio de entrada):
+      same_block  : se altera una vela 1h del MISMO bloque 4h que contiene a p (la que genera la señal);
+      next_block  : se altera una vela 1h del bloque siguiente;
+      later_block : ... de un bloque posterior (3 bloques después);
+      future      : se reemplaza todo lo posterior a p por otro camino;
+      truncate    : se borran las velas 1h posteriores a p (aunque queden bloques a medias: una vela 4h
+                    en formación NO puede aparecer en la serie, y todas las filas que sí aparecen deben
+                    ser idénticas a las de la serie completa).
+    """
+    from .entry_detector import detect_entries
+    base = aggregate(df1h)
+    ts1 = df1h.index.as_unit("ns").asi8.astype("int64")
+    tf_ns = 4 * 3600 * 10 ** 9
+    store0 = FeatureStore(base)
+    sig0 = [c.evaluate(store0) for c in conds]
+    cfg = cfg or ResearchConfig(MAX_HOLDING_BARS=25, COOLDOWN_MODE="until_exit")
+    tbl0 = build_outcome_table(base, cfg)
+    ent0 = [detect_entries(s, Segment("F", 0, len(base)), cfg.MAX_HOLDING_BARS, 1, "until_exit",
+                           tbl0.exit_offset) for s in sig0]
+    fails = {"ohlc": 0, "signals": 0, "entries": 0, "variants": 0}
+    base_ns = base.index.as_unit("ns").asi8.astype("int64")
+
+    def modify_bar(d: pd.DataFrame, q: int) -> pd.DataFrame:
+        out = d.copy()
+        for col in ("Open", "High", "Low", "Close"):
+            out.iloc[q, out.columns.get_loc(col)] = d[col].iloc[q] * 1.07
+        return out
+
+    for p in positions:
+        blk = (ts1[p] // tf_ns) * tf_ns
+        nxt = int(np.searchsorted(ts1, blk + tf_ns))              # primera vela 1h del bloque siguiente
+        later = int(np.searchsorted(ts1, blk + 3 * tf_ns))
+        variants = {"same_block": (modify_bar(df1h, p), blk),
+                    "future": (perturb_future(df1h, p, rng), ((ts1[p] + 3600 * 10 ** 9) // tf_ns) * tf_ns)}
+        if nxt < len(df1h):
+            variants["next_block"] = (modify_bar(df1h, nxt), blk + tf_ns)
+        if later < len(df1h):
+            variants["later_block"] = (modify_bar(df1h, later), blk + 3 * tf_ns)
+        variants["truncate"] = (df1h.iloc[: p + 1], None)
+        for name, (d1, first_changed_ns) in variants.items():
+            fails["variants"] += 1
+            d4 = aggregate(d1)
+            if name == "truncate":
+                # todas las filas de la serie truncada existen idénticas en la completa
+                t4 = d4.index.as_unit("ns").asi8.astype("int64")
+                pos = np.searchsorted(base_ns, t4)
+                ok = bool(len(pos) == 0 or (
+                    pos.max() < len(base) and np.array_equal(base_ns[pos], t4) and np.array_equal(
+                        base[["Open", "High", "Low", "Close"]].to_numpy()[pos],
+                        d4[["Open", "High", "Low", "Close"]].to_numpy())))
+                fails["ohlc"] += int(not ok)
+                m_row = len(d4)                                    # todas las filas de d4 deben coincidir
+                if not ok:
+                    continue
+            else:
+                m_row = int(np.searchsorted(base_ns, first_changed_ns))   # filas con inicio < bloque modificado
+                if len(d4) != len(base) or not np.array_equal(
+                        base[["Open", "High", "Low", "Close"]].to_numpy()[:m_row],
+                        d4[["Open", "High", "Low", "Close"]].to_numpy()[:m_row]):
+                    fails["ohlc"] += 1
+                    continue
+            st = FeatureStore(d4)
+            for c, s0, e0 in zip(conds, sig0, ent0):
+                s1 = c.evaluate(st)
+                if not np.array_equal(s0[:m_row], s1[:m_row]):
+                    fails["signals"] += 1
+                    continue
+                t1 = build_outcome_table(d4, cfg)
+                e1 = detect_entries(s1, Segment("F", 0, len(d4)), cfg.MAX_HOLDING_BARS, 1, "until_exit",
+                                    t1.exit_offset)
+                a0, a1 = e0.confirm_idx[e0.confirm_idx < m_row - 1], e1.confirm_idx[e1.confirm_idx < m_row - 1]
+                if name == "truncate":      # los últimos H de la serie truncada se purgan: comparar el tramo común
+                    lim = len(d4) - 1 - cfg.MAX_HOLDING_BARS
+                    a0, a1 = a0[a0 <= lim], a1[a1 <= lim]
+                ok_e = np.array_equal(a0, a1) and np.array_equal(
+                    base["Open"].to_numpy()[a0 + 1], d4["Open"].to_numpy()[a1 + 1])
+                fails["entries"] += int(not ok_e)
+    return fails
+
+
 def startup_sensitivity(df: pd.DataFrame, operands: dict[str, Operand], starts: list[int],
                         after: int = 2000, rtol: float = 1e-6) -> dict[str, int]:
     """Informativo ("recursive-analysis"): cuántos de los `starts` hacen que el operando, calculado

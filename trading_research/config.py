@@ -31,6 +31,10 @@ class ResearchConfig:
     # ------------------------------------------------------------------ #
     ASSET: str = "BTC"
     TIMEFRAME: str = "1h"
+    # Si el CSV está en otra temporalidad (más fina) que TIMEFRAME, se agrega a TIMEFRAME con
+    # `resample.aggregate_ohlc_strict` (EXP-011): p. ej. TIMEFRAME="4h", CSV_TIMEFRAME="1h".
+    # Vacío = el CSV ya está en TIMEFRAME (comportamiento de siempre).
+    CSV_TIMEFRAME: str = ""
     POSITION_TYPE: str = PositionSide.LONG.value
     DATA_SOURCE: str = "yfinance"          # "yfinance" | "csv"
     CSV_PATH: str | None = None            # usado si DATA_SOURCE == "csv"
@@ -276,6 +280,17 @@ class ResearchConfig:
     SAVE_EVENTS: bool = True
 
     # ------------------------------------------------------------------ #
+    @property
+    def bar_hours(self) -> float:
+        """Duración en horas de una barra de TIMEFRAME."""
+        import pandas as pd
+        return pd.Timedelta(self.TIMEFRAME).total_seconds() / 3600.0
+
+    @property
+    def horizon_hours(self) -> float:
+        """Duración máxima de una operación en horas (MAX_HOLDING_BARS barras de TIMEFRAME)."""
+        return self.MAX_HOLDING_BARS * self.bar_hours
+
     def validate(self) -> None:
         if self.EXIT_MODE not in ("fixed", "atr"):
             raise ValueError("EXIT_MODE debe ser 'fixed' o 'atr'.")

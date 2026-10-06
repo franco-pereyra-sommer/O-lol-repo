@@ -138,6 +138,9 @@ def oos_series_arrays(entry_lists: list[np.ndarray], table: OutcomeTable, n: int
         out["tp_frac_sum"] = np.bincount(e, weights=table.tp_frac[e], minlength=n)
         out["sl_frac_sum"] = np.bincount(e, weights=table.sl_frac[e], minlength=n)
     out["hold_sum"] = np.bincount(e, weights=table.exit_offset[e].astype(float) + 1.0, minlength=n)
+    # Retorno bruto (antes de costos) por vela de entrada (EXP-011): costo = bruto - neto.
+    g = np.nan_to_num(table.gross_return[e])
+    out["gross_sum"] = np.bincount(e, weights=g, minlength=n)
     return out
 
 
