@@ -15,12 +15,12 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 ## 0. Estado actual y guía de lectura
 
-*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-06, tras cerrar EXP-010. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
+*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-06, tras cerrar EXP-011. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
 
 ### 0.1 En pocas palabras
 - **Qué se busca:** reglas de entrada (por ejemplo "RSI cruza tal valor y la media corta supera a la larga") que den ganancia **después de costos**, en datos que la regla **no vio** al elegirse, y de forma repetible en distintos períodos del mercado.
 - **Dónde estamos:** con BTCUSDT 1h (2017-2026) **ninguna variante probada gana dinero fuera de muestra** (EXP-001, 002, 005). No hay "candidato" y el tramo final de datos reservado (holdout) **sigue sin abrirse**.
-- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007 (todas terminadas); EXP-008, EXP-009 y EXP-010 usaron esa infraestructura para probar tres ideas nuevas (más información de contexto; búsqueda estructurada; otra geometría de salida), todas sin mejora. Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
+- **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007 (todas terminadas); EXP-008 a EXP-011 usaron esa infraestructura para probar cuatro ideas nuevas (más información de contexto; búsqueda estructurada; otra geometría de salida; otra escala temporal), todas sin mejora. Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
 
 ### 0.2 Experimentos: estado y conclusión (una línea cada uno)
 | Experimento | Qué fue | Estado | Conclusión |
@@ -36,6 +36,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 | EXP-008 | Features de régimen (tendencia 4h, tendencia diaria, volatilidad relativa) vs baseline, misma metodología | Cerrado | **No mejoran la generalización fuera de muestra** (t pareado +1,29 LONG, −1,14 SHORT; Reality Check p ≥ 0,79). Sólo inflan lo "mejor in-sample" (PBO). Resultado negativo registrado. |
 | EXP-009 | Búsqueda estructurada "contexto + disparador" vs búsqueda aleatoria (mismo presupuesto de 7.500 condiciones por fold) | Cerrado | **No es mejor**: t pareado +0,93 (LONG) y +0,30 (SHORT) contra la aleatoria con las mismas features; Reality Check p ≥ 0,87. Opera entre 9 y 16 veces menos, pero el lift por fold no cambia; ningún procedimiento es rentable. |
 | EXP-010 | Salidas TP/SL proporcionales al ATR (4 variantes pre-fijadas) vs TP 5 % / SL 3 %, mismas entradas | Cerrado | **Caso A (negativo)**: ninguna variante mejora al baseline (R1 = NO en las 8; Reality Check p ≥ 0,81). Con cualquier geometría el TP se alcanza con la frecuencia de una caminata sin ventaja y el neto ≈ −costo: el problema no es la salida. H = 100 no resulta corto (NONE ≤ 15 %). |
+| EXP-011 | Escala temporal: BTCUSDT 4h vs 1h con la misma duración de operación (H = 25 barras de 4h = 100 h), mismo TP/SL, misma búsqueda | Cerrado | **Escenario A (4h no mejora)**: costos por operación, operaciones por condición y ventana (≈ 11,3) y retorno bruto (≈ 0) son iguales en 1h y 4h; la diferencia 4h − 1h no es significativa (t pareado −0,6 y −0,3; Reality Check p ≥ 0,86). Con exits en % y horizonte en horas, cambiar la escala de las barras no cambia el cociente costo/movimiento capturado. |
 
 ### 0.3 Respuestas a las preguntas de revisión
 
@@ -54,7 +55,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 **3. Estado del roadmap.**
 - EXP-001/002 están **cerrados y reproducidos** (se repitieron en EXP-005 y dieron los mismos números al dígito).
-- Terminados: EXP-000 a EXP-010 (ver 0.2). En curso: ninguno.
+- Terminados: EXP-000 a EXP-011 (ver 0.2). En curso: ninguno.
 - **Pendiente de la tabla original** (sección 4, Plan): volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
 - La numeración vieja (EXP-003 = régimen, EXP-004 = contexto+disparador) **ya fue reemplazada** en la sección 4. Las features de régimen (la "EXP-003 original") se probaron en EXP-008 y la estructura "contexto + disparador" (la "EXP-004 original") en EXP-009: ninguna mejoró.
 
@@ -63,7 +64,8 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 2. ~~Features de régimen~~ (hecho en EXP-008: no mejoran la generalización; quedan implementadas y apagadas por defecto).
 3. ~~Contexto + disparador~~ (hecho en EXP-009: no mejora; el generador queda implementado y apagado por defecto).
 4. ~~TP/SL proporcionales al ATR~~ (hecho en EXP-010: no mejora; el modo `atr` queda implementado y apagado por defecto).
-5. **Lo que sigue lo decidís vos.** Hay 5 experimentos de búsqueda seguidos sin avance (EXP-001, 002, 008, 009, 010; CLAUDE.md pide revisar el rumbo a los 10). EXP-010 aportó la evidencia más clara hasta ahora: con cualquier geometría de salida, las entradas seleccionadas alcanzan el TP con la frecuencia que daría una caminata sin ventaja y el retorno neto es ≈ −(costo por operación). Más información, más estructura y otra salida no cambian eso. Lo que queda cambia el *problema* y no la búsqueda: (a) temporalidades de operación más lentas (4h/1D), donde el recorrido por operación es mucho mayor que el costo; (b) otros activos/mercados (más historia independiente, otra estructura de costos); (c) revisar el objetivo (reglas que no sean sólo de entrada, o estrategias de menor frecuencia); (d) más validez (CPCV, PBO sobre el lift). Cada una es un experimento separado y suma variantes a K.
+5. ~~Temporalidad más lenta (4h con la misma duración de operación)~~ (hecho en EXP-011: no mejora; la agregación estricta 1h→4h queda implementada).
+6. **Lo que sigue lo decidís vos.** Hay 6 experimentos de búsqueda seguidos sin avance (EXP-001, 002, 008, 009, 010, 011; CLAUDE.md pide revisar el rumbo a los 10). EXP-011 mostró por qué pasar a 4h no cambió nada: con TP/SL en % y horizonte en horas, la operación dura lo mismo (≈ 36–41 h), se repite el mismo número de veces por mes y paga el mismo costo; y el retorno bruto es ≈ 0 en todos los diseños. Lo que cambiaría el cociente costo/movimiento es la escala del *objetivo*. Opciones (cada una suma variantes a K): (a) objetivos más grandes frente al costo (TP/SL y horizonte escalados, con o sin temporalidad más lenta), sabiendo que con bruto ≈ 0 se espera "perder menos" y no ganar; (b) otros activos/mercados (otra estructura de costos, más historia independiente); (c) revisar el objetivo del proyecto, porque en seis experimentos las entradas seleccionadas no superan a una caminata sin ventaja; (d) más validez estadística (CPCV, PBO sobre el lift).
 - *Decisiones tomadas por Claude que conviene que conozcas y puedas revertir:* (a) se enmendó el criterio de candidato a "t entre folds ≥ 3" (EXP-003); (b) se fijó en 1 % el ATR supuesto en las primeras velas del modelo de slippage (EXP-006); (c) se agregó la regla 7 (Bonferroni con la cuenta K).
 
 ### 0.4 Mini-glosario sin jerga (el glosario técnico está en la sección 1)
@@ -87,7 +89,7 @@ Todo experimento nuevo se evalúa con estas reglas; cambiarlas requiere registra
 - **`n_dropped_horizon` es el mecanismo de purga entre segmentos**: descarta toda señal cuyo horizonte se sale del segmento, de modo que ningún resultado de TRAIN usa precios de VALIDATION. Los tests verifican esa propiedad (`test_trade_label_window_stays_inside_segment`, `test_train_results_do_not_depend_on_future_prices`).
 - **El t entre operaciones es sólo descriptivo; nunca decide.** Decide el **t entre folds** junto con el **t HAC con 3H rezagos (`oos_hac_t_3H`)** (regla 4).
 - Corrección por varias variantes: **regla 7 y definición de K** (sección 2, "Aclaración de la regla 7 y definición de K"). Una sola corrección por familia (Reality Check *o* Bonferroni, no ambas).
-- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 9.691.500 al cierre de EXP-010. K (variantes en el Reality Check) = 16.
+- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 11.041.500 al cierre de EXP-011. K (variantes en el Reality Check) = 18.
 - Toda feature nueva: test de causalidad por truncación/perturbación del futuro y `run_lookahead.py` (EXP-006).
 
 ---
@@ -228,9 +230,9 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
 | Concepto | Valor actual | ¿Entra en K? | Motivo |
 |---|---|---|---|
 | Condiciones individuales generadas | 7.500 por fold y lado | **No** | Se eligen con TRAIN y se miden en VALIDATION sin seleccionar por VALIDATION: la selección ya quedó dentro del procedimiento (EXP-003/004). |
-| Variantes / configuraciones (procedimientos completos) | 16 al cierre de EXP-010 (EXP-001, EXP-002, EXP-008-régimen, EXP-009-estructurada y las cuatro variantes ATR de EXP-010, cada una LONG/SHORT; eran 4 antes de EXP-008, 6 antes de EXP-009 y 8 antes de EXP-010) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
-| Experimentos | 11 (EXP-000 a EXP-010) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
-| Hipótesis acumuladas | 9.691.500 (al cierre de EXP-010) | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
+| Variantes / configuraciones (procedimientos completos) | 18 al cierre de EXP-011 (EXP-001, EXP-002, EXP-008-régimen, EXP-009-estructurada, las cuatro variantes ATR de EXP-010 y EXP-011-4h, cada una LONG/SHORT; eran 4 antes de EXP-008, 6 antes de EXP-009, 8 antes de EXP-010 y 16 antes de EXP-011) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
+| Experimentos | 12 (EXP-000 a EXP-011) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
+| Hipótesis acumuladas | 11.041.500 (al cierre de EXP-011) | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
 | Universo conjunto del Reality Check | las K variantes con series OOS alineables | **Define K** | K = tamaño de ese universo. |
 Pertenece al universo de una variante si: (i) mismo activo, datos y timeframe; (ii) su serie OOS puede alinearse con las demás en la historia común (se usa la intersección); (iii) el investigador podría haber reportado esa variante como "el resultado". Si alguna de las tres no está clara, **no se decide arbitrariamente**: se documenta la duda en la entrada del experimento y se informa el Reality Check con y sin esa variante. Cada variante de una ablación (quitar una feature) cuenta si se mira su resultado OOS.
 
@@ -698,7 +700,7 @@ Sólo dependen de Open[e] y de datos hasta t. La resolución de la operación (q
 **Decisión.** (1) Las salidas por ATR quedan implementadas y probadas (`EXIT_MODE="atr"`, apagadas por defecto; el modo fijo es numéricamente idéntico a antes). (2) No se encadena ningún experimento (ni ATR + indicador, ni nuevo horizonte, ni nuevo activo). (3) Experimentos de búsqueda seguidos sin avance: **5** (EXP-001, 002, 008, 009, 010; CLAUDE.md pide revisar el rumbo a los 10).
 **Próximo paso (a decidir con el usuario, después de leer esta conclusión).** Con entradas simples sobre BTC 1h, ni más información (EXP-008), ni más estructura (EXP-009), ni otra geometría de salida (EXP-010) superan un costo de ≈ 0,25 % por operación: en todas las geometrías la tasa de acierto es la de una caminata sin ventaja. Lo que queda por probar cambia el *problema* y no la búsqueda: (a) temporalidades más lentas (4h/1D como temporalidad de operación), donde el movimiento por operación es mucho mayor que el costo; (b) otros activos u otros mercados (más historia independiente, otra estructura de costos); (c) revisar el objetivo (por ejemplo, reglas que no sean sólo de entrada: tamaño/gestión, o estrategias de menor frecuencia); (d) más validez (CPCV, PBO sobre el lift). Cada una es un experimento separado y suma variantes a K.
 
-### EXP-011 — Escala temporal: BTCUSDT 1h vs 4h con la misma duración de operación [EN CURSO] (2026-10-06)
+### EXP-011 — Escala temporal: BTCUSDT 1h vs 4h con la misma duración de operación (2026-10-06)
 **Pregunta.** Tras EXP-001, 002, 008, 009 y 010 no hay señal de entrada que supere de forma defendible el costo de operar BTCUSDT 1h. ¿La falta de rentabilidad se debe, al menos en parte, a operar a una escala temporal demasiado rápida para que una ventaja pequeña supere los costos? Se compara 1h contra 4h cambiando **sólo** la temporalidad: sin features, salidas, activos ni métodos de búsqueda nuevos.
 **Por qué 4h.** Con costos de ≈ 0,25 % por operación y movimientos típicos por barra de ≈ 0,25–0,5 % (1h), el costo es del mismo orden que el recorrido; en 4h el movimiento por barra se duplica (≈ 0,5–1,1 %) y, a igual duración máxima de la operación, la fricción porcentual por operación es la misma pero cada operación captura un movimiento mayor por barra. Es la hipótesis económica a contrastar; no se asume que sea cierta.
 **Diseño económico.** Misma duración máxima: 1h: H = 100 barras = 100 h; 4h: **H = 25 barras = 100 h** (no 100 barras de 4h = 400 h). TP = 5 %, SL = 3 % (fijos, como EXP-002/010; sin ATR ni otros pares). Entrada: condición confirmada al cierre de t, entrada en Open[t+1]; en 4h, t es una vela 4h completamente cerrada y t+1 la siguiente vela 4h completa.
@@ -722,6 +724,64 @@ Sólo dependen de Open[e] y de datos hasta t. La resolución de la operación (q
 **Pregunta final del informe.** ¿Hay evidencia de que 1h fracasa porque ≈ 0,25 % por operación es demasiado grande frente al movimiento capturado y que 4h ofrece una relación económica más favorable? Se responderá separando: menor turnover; mayor movimiento por operación; cambio en la frecuencia de señales; cambio en el retorno bruto; en los costos; en el neto; evidencia de predictibilidad; robustez estadística.
 **Comandos.** 4h: `pixi run python run_research.py --csv "D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv" --timeframe 4h --csv-timeframe 1h --walk-forward --wf-train-bars 625 --wf-val-bars 180 --side LONG SHORT --tp 0.05 --sl 0.03 --horizon 25 --cooldown-mode until_exit --filter-mode both --cost-scenario typical --no-events --output results/exp011/h4`; 1h: igual con `--timeframe 1h --wf-train-bars 2500 --wf-val-bars 720 --horizon 100 --output results/exp011/h1`. Comparación: `run_timeframe_comparison.py`.
 
+**Resultados (2026-10-06).** *Regresión:* el 1h re-corrido con el código nuevo reproduce **idénticas** las 20 columnas numéricas de `wf_summary.csv` de EXP-002 (LONG y SHORT): el baseline 1h no cambió. 90 folds en ambos timeframes; costos `typical` salvo donde se indica.
+
+| | 1h LONG | **4h LONG** | 1h SHORT | **4h SHORT** |
+|---|---|---|---|---|
+| Neto OOS agrupado | −0,191 % | −0,231 % | −0,146 % | −0,082 % |
+| Ídem `conservative` | −0,344 % | −0,499 % | −0,296 % | −0,332 % |
+| Media por fold del neto | −0,154 % | −0,160 % | −0,184 % | −0,185 % |
+| Media por fold del lift | +0,053 % | +0,060 % | −0,020 % | +0,006 % |
+| t entre folds, neto (lift) | −1,56 (+1,13) | −1,60 (+1,14) | −1,89 (−0,43) | −1,80 (+0,12) |
+| `oos_hac_t_3H` neto (lift) | −1,99 (+0,04) | −2,15 (+0,29) | −0,89 (−0,12) | −1,12 (+0,03) |
+| Folds con neto > 0 (de los que operaron) | 39/89 | 36/87 | 37/74 | 34/73 |
+| Folds que superan la línea base interna | 52 | 48 | 31 | 35 |
+| Folds con neto > 0 en `conservative` | 32 | 27 | 31 | 26 |
+| Operaciones OOS (todas las condiciones seleccionadas) | 895.090 | 449.573 | 492.594 | 266.439 |
+| Condiciones seleccionadas en TRAIN (suma de folds) | 70.595 | 35.745 | 44.549 | 24.267 |
+| Sobreviven el filtro de VALIDATION | 83 | 34 | 58 | 18 |
+
+**Economía por operación y por condición** (1h → 4h; "por condición y ventana" = retorno por condición seleccionada y por ventana de 30 días, promedio de los folds):
+
+| | LONG 1h | LONG 4h | Dif. | SHORT 1h | SHORT 4h | Dif. |
+|---|---|---|---|---|---|---|
+| Retorno bruto por operación | +0,050 % | +0,010 % | −0,040 pp | +0,096 % | +0,160 % | +0,064 pp |
+| Costo por operación (`typical`) | 0,241 % | 0,241 % | 0,000 | 0,242 % | 0,242 % | 0,000 |
+| Neto por operación (`typical`) | −0,191 % | −0,231 % | −0,040 | −0,146 % | −0,082 % | +0,064 |
+| Costo por operación (`conservative`) | 0,395 % | 0,509 % | +0,114 | 0,392 % | 0,492 % | +0,100 |
+| **Operaciones por condición y ventana de 30 días** | **11,43** | **11,25** | −0,18 | **11,34** | **10,55** | −0,79 |
+| Horas medias entre entradas (por condición) | 63,0 | 64,0 | +1,0 | 63,5 | 68,3 | +4,8 |
+| Duración media de la operación | 37,6 h | 35,8 h | −1,8 h | 41,4 h | 39,4 h | −1,9 h |
+| Bruto por condición y ventana | +0,63 % | +0,19 % | −0,44 pp | +1,21 % | +0,83 % | −0,38 pp |
+| **Costo `typical` por condición y ventana** | **2,76 %** | **2,72 %** | −0,05 pp | **2,75 %** | **2,56 %** | −0,19 pp |
+| **Neto por condición y ventana (`typical`)** | −2,13 % | −2,53 % | −0,39 pp | −1,54 % | −1,73 % | −0,19 pp |
+| Neto por condición y ventana (`conservative`) | −3,89 % | −5,38 % | −1,50 pp | −3,39 % | −4,57 % | −1,18 pp |
+| Operaciones por año, agregadas (todas las condiciones seleccionadas) | 121.086 | 60.817 | −50 % | 66.637 | 36.043 | −46 % |
+| TP ÷ (TP + SL) resueltas (caminata sin ventaja: 37,5 %) | 36,8 % | 36,6 % | | 37,7 % | 38,8 % | |
+
+**Motivo de salida (`typical`; % de operaciones · neto medio):** 1h LONG TP 32,4 % (+4,76 %), SL 55,6 % (−3,24 %), NONE 11,8 % (+0,59 %), AMBIGUOUS 0,1 %; 4h LONG TP 32,4 %, SL 56,1 %, NONE 10,8 %, AMBIGUOUS **0,6 %**; 1h SHORT TP 31,9 %, SL 52,7 %, NONE 15,4 %, AMBIGUOUS 0,1 %; 4h SHORT TP 33,5 %, SL 52,9 %, NONE 13,1 %, AMBIGUOUS **0,5 %**. La proporción de AMBIGUOUS se multiplica por ~5–6 al pasar a 4h (barras más grandes tocan TP y SL a la vez), todavía menor al 1 %.
+
+**Descomposición del cambio 4h − 1h en el neto por condición y ventana** (cada condición-ventana con el mismo peso; neto por operación = neto por condición·ventana ÷ operaciones por condición·ventana, de modo que la identidad es exacta): LONG: menor turnover **+0,034 pp**; cambio por operación **−0,427 pp** (bruto −0,428, costo +0,002) → total −0,393 pp, que es la diferencia de neto por condición y ventana de la tabla. SHORT: turnover **+0,108 pp**; por operación **−0,297 pp** (bruto −0,293, costo −0,004) → total −0,190 pp. (El neto por operación agregado de las tablas anteriores pondera por cantidad de operaciones, de ahí que difiera de este neto por operación.)
+**Comparación emparejada por calendario** (ventanas = las 90 VALIDATION de 1h; grilla horaria común; 4h − 1h):
+- LONG: neto por condición y ventana −0,307 pp, t pareado **−0,61** (n = 90), HAC (300 rezagos) −0,56, bootstrap P(4h > 1h) = 0,68, t en `conservative` **−2,15** → R1h = NO. Neto por operación −0,058 pp, t −1,02; `conservative` −2,49 → R1t = NO.
+- SHORT: −0,130 pp, t **−0,28**, HAC −0,26, bootstrap 0,58, `conservative` −1,70 → R1h = NO. Por operación +0,006 pp, t +0,08; `conservative` −1,16 → R1t = NO.
+**R2:** ningún lado (neto agrupado < 0 en `typical` y `conservative`; t entre folds de neto −1,60 y −1,80; HAC −2,15 y −1,12). **Reality Check** (K = 18, bloque 300 h, T = 52.183 h): benchmark cero `typical` p = 1,000 (mejor EXP-009 SHORT; 4h LONG 0,97, 4h SHORT 0,90); exceso sobre la línea base `typical` p = 0,861 (mejor EXP-010 V1 LONG; 4h LONG 0,39, 4h SHORT 0,43); `conservative`: 1,000 / 0,897.
+**Escenario: A — 4h no mejora y sigue negativo.**
+
+**Lectura.** La pregunta final: *¿hay evidencia de que 1h fracasa porque ≈ 0,25 % por operación es demasiado grande frente al movimiento capturado, y de que 4h ofrece una relación más favorable?* **No.** Y el experimento muestra por qué esa premisa no se cumplió en este diseño:
+1. *Efecto de menor turnover — ausente.* A igual TP/SL (5 %/3 %) y a igual duración máxima en horas, la duración media de la operación es la misma (36–41 h en ambos) y también la cantidad de operaciones por condición y ventana de 30 días (11,4 vs 11,2 en LONG; 11,3 vs 10,5 en SHORT). La mitad de operaciones agregadas de 4h (−50 % LONG, −46 % SHORT) se debe a que se seleccionan la mitad de condiciones en TRAIN (35.745 vs 70.595; 24.267 vs 44.549), no a que cada condición opere menos. El efecto de turnover sobre el neto es +0,034 pp (LONG) y +0,108 pp (SHORT): despreciable frente a la caída por operación de −0,427 y −0,297 pp (sin significancia, ver comparación emparejada). El costo por condición y ventana prácticamente no cambia (2,76 → 2,72 % LONG; 2,75 → 2,56 % SHORT). *Con exits en % y horizonte en horas, la temporalidad de las barras no determina el turnover: lo determina el tiempo que tarda el precio en recorrer ±3–5 %.*
+2. *Mayor movimiento por operación — ausente.* El recorrido por operación lo fija el TP/SL en % (TP medio realizado 5,0 %, SL 3,0 % en ambos); el movimiento por *barra* se duplica en 4h (mediana de |retorno| de 0,25 % a 0,50 %), pero eso sólo cambia en cuántas barras se resuelve una operación (≈ 38 barras de 1h vs ≈ 9 barras de 4h), no lo que se captura.
+3. *Frecuencia de señales.* Por condición, sin cambios; menos condiciones superan los filtros de TRAIN en 4h (49–54 % de las de 1h) y menos sobreviven el filtro de VALIDATION (34 y 18 vs 83 y 58).
+4. *Retorno bruto.* ≈ 0 en ambos (+0,05 % y +0,01 % por operación en LONG; +0,10 % y +0,16 % en SHORT); las diferencias (−0,040 pp y +0,064 pp) no son significativas (t por ventana −1,02 y +0,08).
+5. *Costos.* Idénticos por operación con `typical` (0,241–0,242 %); con `conservative` el costo por operación sube de 0,39 % a 0,49–0,51 % en 4h, como se anticipó, porque ese escenario suma un slippage proporcional al ATR de las barras del timeframe (en 4h es ≈ 2× el de 1h): es una propiedad mecánica del modelo existente y explica que 4h luzca peor en `conservative` (t pareado −2,15 en LONG).
+6. *Neto.* Sin mejora: LONG −0,191 % → −0,231 %, SHORT −0,146 % → −0,082 % por operación (agregado), pero por ventana y emparejado por calendario las diferencias son −0,31 pp (t −0,61) y −0,13 pp (t −0,28).
+7. *Predictibilidad.* Sin evidencia: t entre folds del lift +1,13 / +1,14 (LONG) y −0,43 / +0,12 (SHORT) para 1h / 4h; HAC del lift 0,04 / 0,29 y −0,12 / 0,03; y la frecuencia de TP entre las operaciones resueltas (36,6–38,8 %) es la de una caminata sin ventaja (37,5 %) en ambos timeframes.
+8. *Robustez estadística.* Ningún criterio de R1 ni de R2; Reality Check p ≥ 0,86 en las cuatro combinaciones.
+**Conclusión.** Pasar de 1h a 4h con TP 5 %/SL 3 % y H equivalente a 100 h **no cambia la economía**: mismos costos por operación, misma cantidad de operaciones por condición, mismo retorno bruto ≈ 0 y mismo neto ≈ −costo. La hipótesis de que "el costo relativo a 1h sea el principal cuello de botella" **no recibe apoyo de este experimento**, pero tampoco queda refutada en general: lo que el experimento muestra es que **cambiar la escala de las barras sin cambiar la escala del objetivo (TP/SL/horizonte en % y horas) no cambia el cociente costo/movimiento capturado**; y que, además, con retorno bruto ≈ 0 en todos los diseños probados (EXP-009, 010 y 011), una fricción menor por unidad de tiempo reduciría las pérdidas pero no produciría ganancia. Consistente con EXP-010 (con cualquier geometría el TP se alcanza con la frecuencia de una caminata sin ventaja).
+**Cuentas.** Hipótesis de este experimento: **1.350.000** (4h: 7.500 × 90 folds × 2 lados); 1h re-corrido: 0 nuevas; **acumulado 11.041.500**. **K = 18** (4h LONG y SHORT se agregan al universo). Las 4 comparaciones 4h − 1h (2 lados × 2 vistas) no suman a K. Holdout cerrado.
+**Decisión.** (1) La agregación estricta 1h→4h queda implementada y probada (`resample.aggregate_ohlc_strict`, `CSV_TIMEFRAME`); el 1h no cambió. (2) No se encadena ningún experimento (ni 4h + ATR, ni 4h + features, ni 1D, ni otro activo). (3) Experimentos de búsqueda seguidos sin avance: **6** (EXP-001, 002, 008, 009, 010, 011; CLAUDE.md pide revisar el rumbo a los 10).
+**Próximo paso (a decidir con el usuario, después de leer esta conclusión).** EXP-011 deja una pista concreta sobre qué cambia el cociente costo/movimiento: la escala del *objetivo* y no la de las barras. Opciones, cada una un experimento separado que suma variantes a K: (a) objetivos más grandes frente al costo (TP/SL y horizonte escalados en % y horas, p. ej. ×3, con o sin temporalidad más lenta), sabiendo de antemano que con bruto ≈ 0 el resultado esperado es "pierde menos", no "gana"; (b) otros activos o mercados con otra estructura de costos; (c) revisar el objetivo del proyecto, porque en seis experimentos las entradas seleccionadas no superan a una caminata sin ventaja; (d) más validez estadística (CPCV, PBO sobre el lift).
+
 ---
 
 ## 4. Plan
@@ -739,6 +799,7 @@ Hoja de ruta original, conservada:
 6. ~~TP/SL proporcionales al ATR~~ (hecho en EXP-010: sin mejora; el horizonte H = 100 no resultó corto, NONE ≤ 15 %).
 7. Volumen y hora del día / día de la semana; otras features.
 8. Periodicidad de re-search/retraining (ampliar EXP-002).
+   *(Nota 2026-10-06: la temporalidad 4h con la misma duración de operación se probó en EXP-011 sin mejora; 1D y objetivos escalados siguen sin probar.)*
 9. Modelos de costo dependientes de tamaño/precio; spread/slippage dinámicos.
 10. Comparación con Genetic Programming.
 11. CPCV (con purga + embargo sobre `trade_intervals`), PBO sobre el lift, Deflated Sharpe Ratio para reportar un candidato final.

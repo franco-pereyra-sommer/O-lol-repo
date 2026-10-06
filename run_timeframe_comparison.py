@@ -62,14 +62,16 @@ def fold_of_bars(idx: pd.DatetimeIndex, summ: pd.DataFrame) -> np.ndarray:
     return np.where(ok, f, -1)
 
 
-def per_condition_series(z: dict, summ: pd.DataFrame, idx: pd.DatetimeIndex, scenario: str) -> np.ndarray:
-    """Por barra: suma de los netos de las operaciones abiertas / condiciones seleccionadas del fold."""
+def per_condition_series(z: dict, summ: pd.DataFrame, idx: pd.DatetimeIndex, key: str) -> np.ndarray:
+    """Por barra: suma de `key` (p. ej. retornos netos, brutos o conteo) de las operaciones abiertas en la barra
+    dividida por las condiciones seleccionadas del fold. Su suma sobre una ventana de VALIDATION es el valor por
+    condición seleccionada y ventana."""
     f = fold_of_bars(idx, summ)
     nsel = summ["selected_in_train"].to_numpy(float)
     w = np.zeros(len(idx))
     ok = (f >= 0) & z["covered"]
     w[ok] = np.where(nsel[f[ok]] > 0, 1.0 / np.maximum(nsel[f[ok]], 1), 0.0)
-    return z[f"sum_{scenario}"] * w
+    return z[key] * w
 
 
 def paired_t(d: np.ndarray) -> float:
@@ -131,17 +133,20 @@ def main() -> None:
             net_c = float(z["sum_conservative"][cov].sum()) / n
             sel = float(summ["selected_in_train"].sum())
             hours = float(cov.sum()) * bar_h[tf]
-            nfold = len(summ)
+            idx_tf = idx1 if tf == "1h" else idx4
+            nf = int((summ["selected_in_train"] > 0).sum())             # ventanas con condiciones seleccionadas
+            pc = {k: float(per_condition_series(z, summ, idx_tf, k).sum()) / nf
+                  for k in ("cnt", "gross_sum", "sum_typical", "sum_conservative")}
             e = {"trades": int(n), "gross_per_trade": gross, "net_per_trade_typical": net_t,
                  "net_per_trade_conservative": net_c, "cost_per_trade_typical": gross - net_t,
                  "cost_per_trade_conservative": gross - net_c, "selected_conditions_total": int(sel),
-                 "trades_per_condition_window": n / sel, "gross_per_condition_window": float(z["gross_sum"][cov].sum()) / sel,
-                 "net_per_condition_window_typical": float(z["sum_typical"][cov].sum()) / sel,
-                 "net_per_condition_window_conservative": float(z["sum_conservative"][cov].sum()) / sel,
-                 "cost_per_condition_window_typical": (float(z["gross_sum"][cov].sum()) - float(z["sum_typical"][cov].sum())) / sel,
+                 "trades_per_condition_window": pc["cnt"], "gross_per_condition_window": pc["gross_sum"],
+                 "net_per_condition_window_typical": pc["sum_typical"],
+                 "net_per_condition_window_conservative": pc["sum_conservative"],
+                 "cost_per_condition_window_typical": pc["gross_sum"] - pc["sum_typical"],
                  "pooled_trades_per_year": n / (hours / HOURS_YEAR),
                  "pooled_trades_per_1000_bars": n / float(cov.sum()) * 1000,
-                 "hours_between_entries_per_condition": 720.0 / (n / sel),
+                 "hours_between_entries_per_condition": 720.0 / pc["cnt"],
                  "mean_duration_hours": float(z["hold_sum"][cov].sum()) / n * bar_h[tf],
                  "mean_duration_bars": float(z["hold_sum"][cov].sum()) / n,
                  "tp_share_of_resolved": None, "ambiguous_pct": None}
@@ -174,10 +179,16 @@ def main() -> None:
               f"operaciones/condición·ventana {d['trades_per_condition_window']:+.2f}; neto/condición·ventana {d['net_per_condition_window_typical'] * 100:+.3f} pp; "
               f"duración {d['mean_duration_hours']:+.1f} h; operaciones totales {d['trades']:+.0f}")
         e1, e4 = econ[f"1h|{s}"], econ[f"4h|{s}"]
-        turn = (e4["trades_per_condition_window"] - e1["trades_per_condition_window"]) * e1["net_per_trade_typical"]
-        pert = e4["trades_per_condition_window"] * (e4["net_per_trade_typical"] - e1["net_per_trade_typical"])
-        gro = e4["trades_per_condition_window"] * (e4["gross_per_trade"] - e1["gross_per_trade"])
-        cos = -e4["trades_per_condition_window"] * (e4["cost_per_trade_typical"] - e1["cost_per_trade_typical"])
+        # valores por operación con el MISMO peso que el neto por condición·ventana (identidad exacta:
+        # neto_cw = operaciones_cw × neto por operación)
+        def pt(e, k):
+            return e[k] / e["trades_per_condition_window"]
+        n1, n4 = e1["trades_per_condition_window"], e4["trades_per_condition_window"]
+        npt1, npt4 = pt(e1, "net_per_condition_window_typical"), pt(e4, "net_per_condition_window_typical")
+        turn = (n4 - n1) * npt1
+        pert = n4 * (npt4 - npt1)
+        gro = n4 * (pt(e4, "gross_per_condition_window") - pt(e1, "gross_per_condition_window"))
+        cos = -n4 * (pt(e4, "cost_per_condition_window_typical") - pt(e1, "cost_per_condition_window_typical"))
         out["diff_4h_minus_1h"][s]["decomposition"] = {"turnover_effect": turn, "per_trade_effect": pert,
                                                        "per_trade_gross_part": gro, "per_trade_cost_part": cos,
                                                        "total": turn + pert}
@@ -196,14 +207,10 @@ def main() -> None:
         common = z1["covered"] & z4["covered"] & (win >= 0)
         res = {}
         for sc in ("typical", "conservative"):
-            ser1 = per_condition_series(z1, runs[("1h", s)][0], idx1, sc)
+            ser1 = per_condition_series(z1, runs[("1h", s)][0], idx1, f"sum_{sc}")
+            n4 = per_condition_series(runs[("4h", s)][2], runs[("4h", s)][0], idx4, f"sum_{sc}")
             ser4 = np.zeros(len(idx1))
-            f4 = fold_of_bars(idx4, runs[("4h", s)][0])
-            nsel4 = runs[("4h", s)][0]["selected_in_train"].to_numpy(float)
-            raw4 = runs[("4h", s)][2][f"sum_{sc}"]
-            w4 = np.where(f4 >= 0, 1.0 / np.maximum(nsel4[np.clip(f4, 0, len(nsel4) - 1)], 1), 0.0) * (nsel4[np.clip(f4, 0, len(nsel4) - 1)] > 0)
-            pos4 = idx1.get_indexer(idx4)
-            ser4[pos4] = raw4 * w4 * runs[("4h", s)][2]["covered"]
+            ser4[idx1.get_indexer(idx4)] = n4
             diff = (ser4 - ser1)
             dw = np.array([diff[common & (win == w)].sum() for w in range(win.max() + 1)])
             ok = np.array([(common & (win == w)).any() for w in range(win.max() + 1)])
