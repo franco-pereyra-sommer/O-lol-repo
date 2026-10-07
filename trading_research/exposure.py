@@ -82,6 +82,24 @@ def daily_positions(df: pd.DataFrame, state: np.ndarray) -> np.ndarray:
     return pos
 
 
+def calendar_segments(index: pd.DatetimeIndex,
+                      bounds: list[tuple[pd.Timestamp, pd.Timestamp]]) -> list[Segment]:
+    """Ventanas por fecha (EXP-014): las velas de `index` con fecha en [inicio, fin). Con bordes contiguos
+    (el fin de una ventana = el inicio de la siguiente) los segmentos también son contiguos."""
+    ns = index.as_unit("ns").asi8
+    out = []
+    for a, b in bounds:
+        i0 = int(np.searchsorted(ns, pd.Timestamp(a).as_unit("ns").value, side="left"))
+        i1 = int(np.searchsorted(ns, pd.Timestamp(b).as_unit("ns").value, side="left"))
+        out.append(Segment("VALIDATION", i0, i1))
+    return out
+
+
+def pool_mean(series: dict[str, pd.Series]) -> pd.Series:
+    """Promedio entre activos alineado por índice (ventana u hora): sólo entre los activos con dato."""
+    return pd.concat(series, axis=1, sort=True).mean(axis=1, skipna=True)
+
+
 def segment_bar_returns(df: pd.DataFrame, seg: Segment) -> np.ndarray:
     """r[j] para j en [start, end): Open[j+1]/Open[j] − 1; en la última vela Close/Open − 1, para no usar
     ningún precio fuera del segmento."""

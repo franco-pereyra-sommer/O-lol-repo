@@ -167,3 +167,50 @@ def test_windows_are_the_b0_validation_windows():
     v = [f["VALIDATION"] for f in folds]
     assert len(v) == 90 and v[0].start == 3123 and v[-1].end == 67923 == hold.start
     assert all(a.end == b.start for a, b in zip(v[:-1], v[1:]))
+
+
+# ---------------------------------------------------------------------- #
+# EXP-014: ventanas por fecha y combinación entre activos
+# ---------------------------------------------------------------------- #
+from trading_research.exposure import calendar_segments, pool_mean  # noqa: E402
+
+
+def test_calendar_segments_match_index_windows_and_respect_gaps():
+    df = random_walk(3000, 9)
+    idx = df.index
+    w = _windows(len(df), k=4, size=500, start=200)
+    bounds = [(idx[s.start], idx[s.end]) for s in w]
+    assert [(s.start, s.end) for s in calendar_segments(idx, bounds)] == [(s.start, s.end) for s in w]
+    # otro activo con huecos y que empieza más tarde: mismas fechas, otros índices, siguen contiguos
+    keep = np.ones(len(df), dtype=bool)
+    keep[:750] = False                                         # empieza después de la ventana 0 (200-700)
+    keep[[800, 801, 1500]] = False
+    other = df[keep]
+    seg = calendar_segments(other.index, bounds)
+    assert seg[0].n_bars == 0                                   # ventana antes del inicio del activo
+    assert all(a.end == b.start for a, b in zip(seg[:-1], seg[1:]))
+    for (a, b), s in zip(bounds, seg):
+        ts = other.index[s.start:s.end]
+        assert ((ts >= a) & (ts < b)).all()
+        assert ((other.index >= a) & (other.index < b)).sum() == s.n_bars
+    assert seg[1].n_bars == 1200 - 750 - 2 and seg[2].n_bars == 500 - 1   # faltan 800 y 801 (ventana 1) y 1500 (ventana 2)
+    # la zona horaria del índice no influye
+    oz = other.copy()
+    oz.index = other.index.tz_convert("America/Argentina/Buenos_Aires")
+    assert [(s.start, s.end) for s in calendar_segments(oz.index, bounds)] == [(s.start, s.end) for s in seg]
+
+
+def test_pool_mean_uses_only_assets_with_data():
+    a = pd.Series([1.0, 2.0, 3.0], index=[0, 1, 2])
+    b = pd.Series([3.0, 4.0], index=[1, 2])
+    c = pd.Series([np.nan, 6.0], index=[0, 2])
+    p = pool_mean({"a": a, "b": b, "c": c})
+    assert list(p.index) == [0, 1, 2]
+    assert np.allclose(p.to_numpy(), [1.0, 2.5, 13.0 / 3.0])
+
+
+def test_holdout_cut_by_date_removes_everything_from_cut():
+    df = random_walk(1000, 10)
+    cut = df.index[700]
+    d = df[df.index < cut]
+    assert len(d) == 700 and d.index[-1] < cut

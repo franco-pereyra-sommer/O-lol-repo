@@ -34,7 +34,8 @@ HAC_LAGS, N_BLOCKS, MIN_ENTRIES = 720, 5, 30
 SCENARIOS = ("typical", "conservative", "optimistic")
 
 
-def causality_check(df: pd.DataFrame, first: int, n_checks: int, seed: int) -> list[dict]:
+def causality_check(df: pd.DataFrame, first: int, n_checks: int, seed: int,
+                    rules=EXP013_RULES) -> list[dict]:
     """Posiciones invariantes al truncar en k (velas 0..k) y al perturbar después de k (velas 0..k+1).
     La mitad de los cortes, en la vela anterior a un cambio de día (donde se decide la posición)."""
     rng = np.random.default_rng(seed)
@@ -44,7 +45,7 @@ def causality_check(df: pd.DataFrame, first: int, n_checks: int, seed: int) -> l
     ks = np.r_[rng.choice(pre, n_checks // 2, replace=False),
                rng.integers(first, n - 2, n_checks - n_checks // 2)]
     fails = []
-    for rule in EXP013_RULES:
+    for rule in rules:
         full = daily_positions(df, rule.state(df))
         for k in ks:
             k = int(k)

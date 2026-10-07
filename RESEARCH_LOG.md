@@ -40,6 +40,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 | EXP-012 | Escala del objetivo: TP/SL y horizonte ×2, ×3 y ×4 (TRAIN/VAL escalados) | Cerrado (**no concluyente**) | Escenario formal A (sin evidencia de predictibilidad: lift bruto +0,26 %/fold con t = 1,26 en V1 LONG, nada significativo), pero **V2 y V3 casi no seleccionaron condiciones** (1 y 0 folds con operaciones) porque el mínimo efectivo de operaciones en TRAIN subió a 50/75/100 en vez de 30 (error de Claude: `MIN_CASES_FRACTION` escala con el TRAIN). A escalas grandes la línea base sin condición ya gana en LONG por la deriva de BTC: sólo el lift es interpretable. |
 | EXP-012b | Repetición de EXP-012 con el mínimo efectivo de 30 operaciones (corrige la desviación) | Cerrado | **Escenario A informativo**: con selección suficiente (41/29, 25/17 y 14/10 folds con operaciones), el lift bruto por fold va de −0,22 % a +0,25 % con t entre −0,84 y +1,44 (umbrales 3,11–3,35); Reality Check de predictibilidad p = 0,97. El bruto/neto positivo en LONG a escalas grandes es la deriva de BTC (la línea base sin condición lo reproduce); sólo el lift es interpretable. |
 | EXP-013 | Rama a2: regla diaria "comprado o en efectivo" (3 reglas fijas: tendencia 20 y 100 días, calma) contra exposición constante igualada | Cerrado | **Escenario A informativo**: ninguna regla supera a la exposición constante con la exigencia de K = 33 (t del lift neto +0,55, +1,76 y −2,33 contra 3,05). La tendencia de 100 días es positiva en los 5 tramos (t +1,76; Sharpe 1,01 vs 0,76) pero no significativa: queda como observación. "No operar en momentos agitados" es significativamente peor (t −2,33). |
+| EXP-014 | Confirmación de R2 (tendencia de 100 días) tal cual en ETH, XRP y BNB (mismas ventanas de calendario, holdout por fecha) | **Preregistrado** (en curso) | Criterio fijado antes de correr; K 33 → 36. |
 
 ### 0.3 Respuestas a las preguntas de revisión
 
@@ -74,6 +75,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 - **Decisión del usuario (2026-10-06): se elige la opción (a), cambiar el objeto de estudio.** Todavía **no se definió cuál de las dos ramas** (otros activos/mercados, o reglas que no son de entrada como filtros "no operar" o tamaño/gestión) ni el diseño; eso se decide al arrancar la conversación siguiente, y cualquier descarga de datos de otros activos o costos distintos requiere autorización explícita. Contexto para retomar: `HANDOFF.md`.
 - **Decisión del usuario (2026-10-06, conversación siguiente): rama a2** (reglas que no son de entrada), frente a a1 (el mismo método en ETH, XRP y BNB; K 30 → 36, ≈ 3,9 M hipótesis, descarga de datos). Se diseñó como **EXP-013**: tres reglas fijas de "comprado o en efectivo" revisadas una vez por día, comparadas contra mantener siempre la misma exposición promedio (así la suba de BTC no cuenta como mérito). El usuario autorizó el criterio de candidato adaptado (incluido el mínimo de 30 entradas) y **reiniciar en 0 el contador de experimentos seguidos sin avance** (los 8 de la línea de entradas quedan registrados). Detalle y reglas en la entrada EXP-013.
 - **Estado tras EXP-013 (propuesta; decide el usuario):** escenario A informativo. Ninguna de las tres reglas de "estar o no estar comprado" demuestra valor sobre mantener siempre la misma exposición. La de tendencia de 100 días (R2) es la observación más cercana a una señal de todo el proyecto, pero no es candidata (t 1,76 contra 3,05; pocos episodios largos; regla clásica, posiblemente influida por conocimiento previo). Opciones: (a) cerrar la línea de reglas técnicas simples sobre BTC 1h; (b) confirmar R2 tal cual, sin tocarla, en otros activos (requiere autorizar descarga de datos y costos; confirmación parcial porque esas criptos se mueven junto con BTC); (c) rama a1 con el método de entradas. Abrir el holdout para R2 no corresponde. Contador de experimentos seguidos sin avance (línea nueva): 1. Nada se ejecuta sin autorización.
+- **Decisión del usuario (2026-10-06): opción (b)**, confirmar R2 tal cual en ETH, XRP y BNB. Autorizó la descarga de esos tres pares de Binance, usar los mismos costos que en BTC y el criterio de decisión (K 33 → 36). Es **EXP-014**; detalle en su entrada.
 - *Lección sobre horizontes largos:* en un activo con tendencia, el retorno bruto o neto absoluto de LONG crece con el horizonte aun sin ninguna señal (la línea base sin condición lo reproduce); sólo el lift contra la línea base de la misma ventana y geometría es interpretable. Y: el mínimo efectivo de operaciones es `max(30, 1 % de las barras del TRAIN)`; al cambiar la longitud del TRAIN hay que decidirlo explícitamente (EXP-012/012b).
 - *Decisiones tomadas por Claude que conviene que conozcas y puedas revertir:* (a) se enmendó el criterio de candidato a "t entre folds ≥ 3" (EXP-003); (b) se fijó en 1 % el ATR supuesto en las primeras velas del modelo de slippage (EXP-006); (c) se agregó la regla 7 (Bonferroni con la cuenta K).
 
@@ -1077,6 +1079,79 @@ Las sumas de la tabla son **sumas simples de retornos horarios, sin reinversión
   - Limitación: esos activos están muy correlacionados con BTC y comparten sus mercados bajistas, así que una confirmación ahí sería sólo parcial.
 - (c) Rama a1 tal como se propuso: el método de entradas B0 en otras criptos.
 - Abrir el holdout para R2 **no corresponde**, porque no cumple el criterio.
+
+### EXP-014 — Confirmación de R2 (tendencia de 100 días) en ETH, XRP y BNB (2026-10-06)
+**Origen.** EXP-013 terminó en escenario A, y R2 quedó como observación (lift neto t +1,76, 5/5 tramos). De las opciones propuestas, el usuario eligió la **(b): confirmar R2 tal cual fuera de la historia de BTC**. Antes de preregistrar autorizó explícitamente tres cosas:
+- descargar ETHUSDT, XRPUSDT y BNBUSDT 1h de data.binance.vision (misma fuente y mismo script que BTC);
+- usar en esos pares los mismos escenarios de costos de BTC;
+- el criterio de decisión de abajo, con K 33 → 36.
+
+**Pregunta.** ¿El valor de timing que R2 mostró en BTC, sin significancia, aparece también en otras criptos grandes, con la regla fijada de antemano? Es una prueba de confirmación de una sola regla, no una búsqueda.
+**Limitaciones conocidas antes de correr.**
+1. El período es el mismo y los activos están muy correlacionados con BTC. Pasaron por los mismos mercados bajistas (2018, 2022), que es donde R2 ganó en BTC. Por eso "consistente" sólo diría que el patrón no es exclusivo de BTC: no es una historia independiente en el tiempo.
+2. El holdout dura ≈ 16 meses: tiene poca potencia para un efecto de este tamaño, incluso si R2 llegara a candidata.
+
+**Qué queda idéntico a EXP-013.**
+- La regla R2: `HTFTrend("1D", 100) > 0`, revisada en la primera vela de cada día UTC, comprado o en efectivo.
+- Órdenes de mercado, con el costo por lado del escenario.
+- Estrategia continua entre ventanas: empieza en efectivo y se liquida al final. Retornos simples sumados.
+- Benchmark de exposición constante igualada ē, la propia de cada activo.
+- HAC con 720 rezagos y mínimo de 30 entradas.
+
+**Lo único que cambia es el activo.**
+**Datos.** Se bajan con `python -m trading_research.binance_data --symbol <PAR> --interval 1h --out "D:\O lol\Guardado de datos\<PAR>_binance_1h.csv" --cache "D:\O lol\Guardado de datos\binance_cache"`. Se informan la cobertura y las velas faltantes de cada uno. No se mira ningún precio ni gráfico.
+**Ventanas: las mismas de calendario que EXP-013.**
+- Los bordes son las fechas de las 90 VALIDATION de B0 en BTC: de 2017-12-25 14:00 a 2025-05-22 14:00 UTC. En cada activo, la ventana w son sus velas con fecha en [inicio_w, fin_w).
+- Una ventana se incluye en un activo si tiene velas y R2 está definida (no NaN) en todas ellas, es decir, después del calentamiento de 100 días. Las ventanas incluidas tienen que ser consecutivas hasta el final; si no lo son, el resultado es el escenario D.
+- Se esperan ≈ 90 ventanas (ETH), ≈ 88 (BNB) y ≈ 82 (XRP). Los números exactos se informan con el resultado y no cambian nada de lo que sigue.
+
+**Holdout.** En los tres activos, todo lo que tiene fecha ≥ 2025-05-22 14:00 UTC (inicio del holdout de BTC) se recorta antes de cualquier cálculo. El holdout queda cerrado para los cuatro activos.
+**Costos.** Los parámetros no cambian.
+- `typical` decide (0,125 % por lado).
+- `conservative` es la prueba de robustez; incluye 0,05 × ATR(14)/Close de cada activo.
+- `optimistic` sólo se reporta.
+
+**Causalidad.** Antes de calcular retornos, se verifica truncando y perturbando en 200 cortes por activo, la mitad en la vela previa a un cambio de día. Si falla, el resultado es el escenario D.
+
+**Estadístico principal (combinado).**
+- Por ventana de calendario w: P_w = promedio, entre los activos que tienen esa ventana, del lift neto L_{a,w} (`typical`).
+- t entre ventanas de P_w (g.l. = ventanas − 1).
+- HAC con 720 rezagos sobre la serie horaria combinada: en cada hora, el promedio del lift neto horario de los activos con dato en esa hora.
+- Tramos: los mismos 5 tramos de 18 ventanas de calendario que en EXP-013 (suma de P_w por tramo).
+
+**Resultado (fijado antes de correr).**
+- **Candidata** si se cumplen todas:
+  - P1: la media de P_w es > 0, con t ≥ **3,08** (= máx(3; Bonferroni(K = 36; 89 g.l.)) = 3,077).
+  - P2: el HAC de la serie combinada es ≥ 2.
+  - P3: el lift neto total (Σ_w L_{a,w}, `typical`) es > 0 en **cada uno** de los tres activos.
+  - P4: Σ P_w > 0 en al menos 4 de 5 tramos.
+  - P5: el lift neto combinado es > 0 con `conservative`, y R2 gana en términos absolutos (neto > 0, con `typical` y con `conservative`) en cada activo.
+  - P6: hay al menos 30 entradas en cada activo.
+
+  En ese caso se frena y se presenta al usuario; el holdout no se abre sin su autorización.
+- **Consistente, no concluyente:** se cumplen P3 a P6 y el t de P1 está entre 2 y 3,08 (o se cumple P1 pero no P2). Se registra, no se persigue y el holdout sigue cerrado.
+- **No confirmada:** cualquier otro caso (t < 2, algún activo con lift neto total ≤ 0, o fallan P4/P5). R2 se descarta como algo propio de BTC o como azar, y se cierra la rama a2.
+- **No concluyente (D):** falla la causalidad o la descarga, las ventanas incluidas no son consecutivas, o algún activo tiene < 30 entradas o ē igual a 0 o 1.
+
+Además se informan, sin poder de decisión: los resultados por activo (t, HAC, tramos); la correlación de los lifts por ventana entre activos y con el de R2 en BTC (EXP-013), que mide cuán poco independiente es la confirmación; y un Reality Check sobre las tres series en las horas comunes.
+
+**Contabilidad (antes de correr).**
+- Hipótesis nuevas: R2 × ventanas incluidas, ≈ 260 (el número exacto va con el resultado). Acumulado ≈ 13.832.030.
+- **K: 33 → 36.** R2 en ETH, XRP y BNB cuenta como tres variantes (criterio conservador), aunque decide el combinado.
+- Contador de experimentos seguidos sin avance: si no hay avance, llega a 2 en la línea nueva.
+
+**Código.** En `trading_research/exposure.py` se agregan `calendar_segments` (ventanas por fecha) y el promedio entre activos (`pool_mean`). Script nuevo: `run_exposure_confirm.py`. Tests:
+- ventanas por fecha: contiguas, respetan los huecos e iguales a las de BTC cuando las fechas coinciden;
+- el promedio usa sólo los activos con dato;
+- el recorte por fecha del holdout.
+
+**Qué NO se hace.**
+- No se cambia R2 ni ningún parámetro.
+- No se prueban R1, R3 ni variantes en estos activos, y no se agregan activos.
+- No se abre el holdout, no se encadena EXP-015 y no se hace push.
+
+**Comando.** `pixi run python run_exposure_confirm.py --btc-csv "D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv" --asset ETHUSDT="D:\O lol\Guardado de datos\ETHUSDT_binance_1h.csv" --asset XRPUSDT=... --asset BNBUSDT=... --output results/exp014`.
+**Preparación hecha antes de bajar datos y correr.** Tests: 118 pasan (3 nuevos para EXP-014). Prueba en seco del script sobre tres paseos al azar sintéticos con inicios distintos y huecos (sin datos reales): corre de punta a punta, incluye 90/88/82 ventanas consecutivas y da "No confirmada" (t combinado −1,50: no inventa señal en ruido).
 
 ---
 
