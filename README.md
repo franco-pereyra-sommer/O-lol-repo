@@ -4,6 +4,10 @@ Herramienta de investigación: genera condiciones de entrada, detecta cuándo se
 habrían cumplido y mide estadísticamente qué pasó con el precio después.
 **No ejecuta operaciones ni se conecta a exchanges.**
 
+> **Estado (2026-10-06): línea de investigación cerrada.** En 16 experimentos, ninguna regla basada sólo en
+> precios pasados mostró ganancia fuera de muestra después de costos. Conclusión en
+> [`CONCLUSIONES.md`](CONCLUSIONES.md); detalle en [`RESEARCH_LOG.md`](RESEARCH_LOG.md) (empezar por la sección 0).
+
 ## Uso
 
 ```bash

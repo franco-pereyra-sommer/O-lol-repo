@@ -15,7 +15,13 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 ## 0. Estado actual y guía de lectura
 
-*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-06, tras cerrar EXP-014. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
+*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-06, al cerrar la línea de investigación (después de EXP-014). El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
+
+### 0.0 La línea está cerrada (2026-10-06)
+- **Decisión del usuario:** cerrar la línea "reglas técnicas sobre precios en cripto" y escribir la conclusión. No queda ningún experimento en curso ni pendiente.
+- **Conclusión:** en 16 experimentos (EXP-000 a EXP-014), ninguna regla basada sólo en precios pasados (búsqueda de entradas en BTC y reglas de "estar o no estar comprado" en BTC, ETH, XRP y BNB) mostró ganancia fuera de muestra después de costos. Tampoco antes de costos: la capacidad de anticipar la dirección fue ≈ 0, y lo que parecía ganancia era la suba de BTC.
+- **Documento de cierre:** `CONCLUSIONES.md` (qué se probó, qué se puede y qué no se puede concluir, límites, qué queda para reutilizar y cómo retomar).
+- **Estado final:** 13.832.030 condiciones evaluadas, K = 36, 0 candidatos. El holdout **nunca se abrió** (BTC, ETH, XRP y BNB desde 2025-05-22 14:00 UTC) y queda reservado para un eventual candidato futuro.
 
 ### 0.1 En pocas palabras
 - **Qué se busca:** reglas de entrada (por ejemplo "RSI cruza tal valor y la media corta supera a la larga") que den ganancia **después de costos**, en datos que la regla **no vio** al elegirse, y de forma repetible en distintos períodos del mercado.
@@ -77,6 +83,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 - **Estado tras EXP-013 (propuesta; decide el usuario):** escenario A informativo. Ninguna de las tres reglas de "estar o no estar comprado" demuestra valor sobre mantener siempre la misma exposición. La de tendencia de 100 días (R2) es la observación más cercana a una señal de todo el proyecto, pero no es candidata (t 1,76 contra 3,05; pocos episodios largos; regla clásica, posiblemente influida por conocimiento previo). Opciones: (a) cerrar la línea de reglas técnicas simples sobre BTC 1h; (b) confirmar R2 tal cual, sin tocarla, en otros activos (requiere autorizar descarga de datos y costos; confirmación parcial porque esas criptos se mueven junto con BTC); (c) rama a1 con el método de entradas. Abrir el holdout para R2 no corresponde. Contador de experimentos seguidos sin avance (línea nueva): 1. Nada se ejecuta sin autorización.
 - **Decisión del usuario (2026-10-06): opción (b)**, confirmar R2 tal cual en ETH, XRP y BNB. Autorizó la descarga de esos tres pares de Binance, usar los mismos costos que en BTC y el criterio de decisión (K 33 → 36). Es **EXP-014**; detalle en su entrada.
 - **Estado tras EXP-014 (propuesta; decide el usuario):** R2 no se confirmó en ETH, XRP y BNB (combinado t +0,45; XRP en contra). Se cierra la rama a2. En 16 experimentos, ninguna regla basada sólo en precios pasados (entradas ni exposición) mostró ventaja fuera de muestra después de costos. Opciones: (a) cerrar la línea de reglas técnicas sobre precios en cripto y escribir la conclusión; (b) cambiar el tipo de información (p. ej., funding de futuros perpetuos, misma fuente pública de Binance; requiere autorización y diseño nuevo); (c) revisar el objetivo del proyecto. Contador de experimentos seguidos sin avance (línea nueva): 2. Nada se ejecuta sin autorización.
+- **Decisión del usuario (2026-10-06): opción (a), cerrar la línea y escribir la conclusión.** Ver 0.0, la entrada "Cierre de la línea" en la sección 3 y `CONCLUSIONES.md`.
 - *Lección sobre horizontes largos:* en un activo con tendencia, el retorno bruto o neto absoluto de LONG crece con el horizonte aun sin ninguna señal (la línea base sin condición lo reproduce); sólo el lift contra la línea base de la misma ventana y geometría es interpretable. Y: el mínimo efectivo de operaciones es `max(30, 1 % de las barras del TRAIN)`; al cambiar la longitud del TRAIN hay que decidirlo explícitamente (EXP-012/012b).
 - *Decisiones tomadas por Claude que conviene que conozcas y puedas revertir:* (a) se enmendó el criterio de candidato a "t entre folds ≥ 3" (EXP-003); (b) se fijó en 1 % el ATR supuesto en las primeras velas del modelo de slippage (EXP-006); (c) se agregó la regla 7 (Bonferroni con la cuenta K).
 
@@ -1225,9 +1232,31 @@ Opciones:
 
 Nada se ejecuta sin autorización.
 
+
+### Cierre de la línea "reglas técnicas sobre precios en cripto" (2026-10-06)
+**Decisión del usuario.** Después de EXP-014, el usuario eligió la opción (a): cerrar la línea y escribir la conclusión. **No es un experimento:** no se corrió nada nuevo ni se probaron hipótesis nuevas. El acumulado queda en 13.832.030 condiciones evaluadas, K en 36 y el holdout sin abrir.
+
+**Conclusión** (desarrollada en `CONCLUSIONES.md`).
+1. No hay ventaja después de costos en ninguna variante. Ninguna se acercó al criterio de candidato.
+2. Tampoco hay ventaja antes de costos: el lift bruto contra la referencia correcta fue ≈ 0 en todos los diseños. Ningún t llegó a 2 (el más alto fue 1,93, R2 en BTC). Bajar costos sólo haría perder menos.
+3. La ganancia aparente de LONG a plazos largos es la deriva alcista de BTC: la línea base o la exposición constante la reproducen.
+4. La única observación cercana a una señal (R2) no se confirmó en ETH, XRP y BNB.
+5. El resultado se mantuvo con todas las variantes de búsqueda, salida, escala, estructura y contexto probadas.
+
+**Límites** (qué no se puede concluir): sólo se usó información derivada del precio (sin volumen, hora del día, funding, libro de órdenes, on-chain); sólo reglas simples, sin modelos estadísticos ni de aprendizaje automático; operaciones de horas a semanas con velas de 1 h y 4 h; cripto spot de Binance; período 2017-12 a 2025-05.
+
+**Estado que queda.**
+- El holdout de BTC, ETH, XRP y BNB (desde 2025-05-22 14:00 UTC) está intacto y reservado: se puede usar una sola vez, para un candidato.
+- El código y los 118 tests quedan como infraestructura reutilizable. Los datos quedan en `D:\O lol\Guardado de datos`.
+- Si se retoma: con información distinta, un diseño preregistrado y autorización. La cuenta de K y de hipótesis continúa desde 36 y 13.832.030.
+- Contador de experimentos seguidos sin avance: 2 al cierre (línea nueva).
+- No se hizo push.
+
 ---
 
 ## 4. Plan
+
+> **Línea cerrada el 2026-10-06** (ver 0.0 y `CONCLUSIONES.md`). Los ítems pendientes de abajo quedan registrados sólo como ideas para una eventual línea nueva; ninguno está en curso ni autorizado.
 
 Orden revisado a pedido del usuario (2026-10-04): primero validez estadística del proceso (EXP-003 y EXP-004, hechos), después el resto. La numeración siguiente es provisoria y se puede cambiar según resultados, registrando el motivo. Cada ítem es un experimento separado.
 

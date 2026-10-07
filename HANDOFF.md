@@ -2,7 +2,12 @@
 
 Este archivo existe para retomar el trabajo en una conversación nueva sin perder contexto. **Lo que decide es `RESEARCH_LOG.md` (sección 0 y reglas de la sección 2); acá sólo está lo que el log no dice** (acuerdos hechos de palabra, trampas del entorno y la decisión pendiente). Si algo de acá contradice al log o a `CLAUDE.md`, mandan ellos.
 
-## 00. Actualización (2026-10-06, después de EXP-014) — leer primero
+## 000. LÍNEA CERRADA (2026-10-06) — leer primero
+- Tras EXP-014, el usuario eligió **cerrar la línea "reglas técnicas sobre precios en cripto"**. La conclusión está en `CONCLUSIONES.md` y el cierre, en la sección 0.0 y en la última entrada de la sección 3 de `RESEARCH_LOG.md`.
+- **No hay trabajo pendiente ni autorizado.** Estado final: 16 experimentos, 13.832.030 condiciones evaluadas, K = 36, 0 candidatos. Holdout nunca abierto (BTC, ETH, XRP y BNB desde 2025-05-22 14:00 UTC). Sin push.
+- Si se abre una línea nueva, necesita información distinta, un diseño preregistrado y autorización. K y el contador de hipótesis continúan desde los valores de arriba. Las secciones de abajo son historia.
+
+## 00. Actualización (2026-10-06, después de EXP-014)
 - El usuario eligió la opción (b): confirmar R2 tal cual en ETH, XRP y BNB. Autorizó la descarga de esos pares (ya están en `D:\O lol\Guardado de datos\`), los mismos costos que en BTC y el criterio de decisión.
 - **EXP-014: "No confirmada".** El combinado da t +0,45 contra 3,08; en XRP va en contra (t −1,14), en ETH y BNB es positivo pero débil (t ≈ 1). Se cerró la rama a2.
 - Cuentas: **K = 36**, **13.832.030 hipótesis**, contador sin avance = 2. Holdout cerrado en los cuatro activos (desde 2025-05-22 14:00 UTC). Sin push. 118 tests pasan.
