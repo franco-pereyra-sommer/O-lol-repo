@@ -2,7 +2,13 @@
 
 Este archivo existe para retomar el trabajo en una conversación nueva sin perder contexto. **Lo que decide es `RESEARCH_LOG.md` (sección 0 y reglas de la sección 2); acá sólo está lo que el log no dice** (acuerdos hechos de palabra, trampas del entorno y la decisión pendiente). Si algo de acá contradice al log o a `CLAUDE.md`, mandan ellos.
 
-## 0. Actualización (2026-10-06, después de EXP-013) — leer primero
+## 00. Actualización (2026-10-06, después de EXP-014) — leer primero
+- El usuario eligió la opción (b): confirmar R2 tal cual en ETH, XRP y BNB. Autorizó la descarga de esos pares (ya están en `D:\O lol\Guardado de datos\`), los mismos costos que en BTC y el criterio de decisión.
+- **EXP-014: "No confirmada".** El combinado da t +0,45 contra 3,08; en XRP va en contra (t −1,14), en ETH y BNB es positivo pero débil (t ≈ 1). Se cerró la rama a2.
+- Cuentas: **K = 36**, **13.832.030 hipótesis**, contador sin avance = 2. Holdout cerrado en los cuatro activos (desde 2025-05-22 14:00 UTC). Sin push. 118 tests pasan.
+- **Próximo paso sin decidir:** (a) cerrar la línea de reglas técnicas sobre precios en cripto y escribir la conclusión; (b) otro tipo de información (p. ej., funding de futuros; requiere autorización); (c) revisar el objetivo. Detalle en la entrada EXP-014 del log.
+
+## 0. Actualización (2026-10-06, después de EXP-013)
 - Lo que sigue abajo (secciones 1 a 8) se escribió **antes** de EXP-013 y quedó desactualizado en lo que dice de la rama pendiente; lo vigente es esto y la sección 0 del log.
 - El usuario eligió la **rama a2** y **reiniciar en 0 el contador de experimentos seguidos sin avance**. Se preregistró y corrió **EXP-013**: tres reglas fijas de "comprado o en efectivo" (tendencia de 20 y 100 días, calma 24/240 h) contra exposición constante igualada. Resultado: **escenario A informativo**, sin candidato. R2 (tendencia de 100 días) quedó como observación: positiva en los 5 tramos, pero con t 1,76 contra 3,05. R3 es significativamente peor que la exposición constante.
 - Cuentas: **K = 33**, **13.831.770 hipótesis**, contador sin avance = 1, holdout cerrado, sin push. Código nuevo: `trading_research/exposure.py`, `run_exposure.py`, `tests/test_exposure.py` (115 tests pasan).

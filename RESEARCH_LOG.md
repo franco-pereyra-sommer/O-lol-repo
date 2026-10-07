@@ -15,11 +15,11 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 ## 0. Estado actual y guía de lectura
 
-*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-06, tras cerrar EXP-013. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
+*Esta sección es el punto de entrada para quien no siguió el trabajo. Se actualiza al cerrar cada experimento. Última actualización: 2026-10-06, tras cerrar EXP-014. El detalle de cada experimento está en la sección 3 (bitácora); acá sólo se resume y se señala dónde mirar.*
 
 ### 0.1 En pocas palabras
 - **Qué se busca:** reglas de entrada (por ejemplo "RSI cruza tal valor y la media corta supera a la larga") que den ganancia **después de costos**, en datos que la regla **no vio** al elegirse, y de forma repetible en distintos períodos del mercado.
-- **Dónde estamos:** con BTCUSDT 1h (2017-2026) **ninguna variante probada gana dinero fuera de muestra** (EXP-001, 002, 005). No hay "candidato" y el tramo final de datos reservado (holdout) **sigue sin abrirse**. Tras ocho experimentos de entradas sin avance se cambió el objeto de estudio (EXP-013): en lugar de buscar entradas, se probó si conviene "estar o no estar comprado" según la tendencia o la volatilidad. Ninguna de las tres reglas le gana con claridad a mantener siempre la misma exposición; la de tendencia de 100 días es la más cercana (positiva en los 5 tramos del período, pero con t = 1,76 contra un umbral de 3,05).
+- **Dónde estamos:** con BTCUSDT 1h (2017-2026) **ninguna variante probada gana dinero fuera de muestra** (EXP-001, 002, 005). No hay "candidato" y el tramo final de datos reservado (holdout) **sigue sin abrirse**. Tras ocho experimentos de entradas sin avance se cambió el objeto de estudio (EXP-013): en lugar de buscar entradas, se probó si conviene "estar o no estar comprado" según la tendencia o la volatilidad. Ninguna de las tres reglas le gana con claridad a mantener siempre la misma exposición; la de tendencia de 100 días es la más cercana (positiva en los 5 tramos del período, pero con t = 1,76 contra un umbral de 3,05). Al probarla tal cual en ETH, XRP y BNB (EXP-014) **no se confirmó**: funciona algo en ETH y BNB, va en contra en XRP y en conjunto da t = 0,45. **Ninguna regla basada sólo en precios pasados mostró ventaja fuera de muestra después de costos.**
 - **Qué se hizo además:** una buena parte del trabajo fue **comprobar que las mediciones son honestas** (que no se "espíe" el futuro, que no se confunda suerte con señal, que los números de confianza no estén inflados). Eso es lo que cubren EXP-003 a EXP-007 (todas terminadas); EXP-008 a EXP-012b usaron esa infraestructura para probar cinco ideas nuevas (más información de contexto; búsqueda estructurada; otra geometría de salida; otra escala temporal; objetivos mayores), todas sin mejora. Esa infraestructura es la que permitirá creer en un resultado positivo si algún día aparece.
 
 ### 0.2 Experimentos: estado y conclusión (una línea cada uno)
@@ -40,7 +40,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 | EXP-012 | Escala del objetivo: TP/SL y horizonte ×2, ×3 y ×4 (TRAIN/VAL escalados) | Cerrado (**no concluyente**) | Escenario formal A (sin evidencia de predictibilidad: lift bruto +0,26 %/fold con t = 1,26 en V1 LONG, nada significativo), pero **V2 y V3 casi no seleccionaron condiciones** (1 y 0 folds con operaciones) porque el mínimo efectivo de operaciones en TRAIN subió a 50/75/100 en vez de 30 (error de Claude: `MIN_CASES_FRACTION` escala con el TRAIN). A escalas grandes la línea base sin condición ya gana en LONG por la deriva de BTC: sólo el lift es interpretable. |
 | EXP-012b | Repetición de EXP-012 con el mínimo efectivo de 30 operaciones (corrige la desviación) | Cerrado | **Escenario A informativo**: con selección suficiente (41/29, 25/17 y 14/10 folds con operaciones), el lift bruto por fold va de −0,22 % a +0,25 % con t entre −0,84 y +1,44 (umbrales 3,11–3,35); Reality Check de predictibilidad p = 0,97. El bruto/neto positivo en LONG a escalas grandes es la deriva de BTC (la línea base sin condición lo reproduce); sólo el lift es interpretable. |
 | EXP-013 | Rama a2: regla diaria "comprado o en efectivo" (3 reglas fijas: tendencia 20 y 100 días, calma) contra exposición constante igualada | Cerrado | **Escenario A informativo**: ninguna regla supera a la exposición constante con la exigencia de K = 33 (t del lift neto +0,55, +1,76 y −2,33 contra 3,05). La tendencia de 100 días es positiva en los 5 tramos (t +1,76; Sharpe 1,01 vs 0,76) pero no significativa: queda como observación. "No operar en momentos agitados" es significativamente peor (t −2,33). |
-| EXP-014 | Confirmación de R2 (tendencia de 100 días) tal cual en ETH, XRP y BNB (mismas ventanas de calendario, holdout por fecha) | **Preregistrado** (en curso) | Criterio fijado antes de correr; K 33 → 36. |
+| EXP-014 | Confirmación de R2 (tendencia de 100 días) tal cual en ETH, XRP y BNB (mismas ventanas de calendario, holdout por fecha) | Cerrado | **No confirmada**: lift neto t +1,04 (ETH), −1,14 (XRP), +0,99 (BNB); combinado t +0,45 contra 3,08, 3/5 tramos. R2 se descarta como propia de BTC o azar y se cierra la rama a2. |
 
 ### 0.3 Respuestas a las preguntas de revisión
 
@@ -59,7 +59,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 **3. Estado del roadmap.**
 - EXP-001/002 están **cerrados y reproducidos** (se repitieron en EXP-005 y dieron los mismos números al dígito).
-- Terminados: EXP-000 a EXP-013 (ver 0.2). En curso: ninguno.
+- Terminados: EXP-000 a EXP-014 (ver 0.2). En curso: ninguno.
 - **Pendiente de la tabla original** (sección 4, Plan): volumen y hora del día; periodicidad de re-búsqueda; modelos de costo dinámicos; comparación con Genetic Programming; CPCV, PBO sobre el lift y Deflated Sharpe. Nada de esto se descartó; cada uno se evalúa como experimento separado.
 - La numeración vieja (EXP-003 = régimen, EXP-004 = contexto+disparador) **ya fue reemplazada** en la sección 4. Las features de régimen (la "EXP-003 original") se probaron en EXP-008 y la estructura "contexto + disparador" (la "EXP-004 original") en EXP-009: ninguna mejoró.
 
@@ -76,6 +76,7 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 - **Decisión del usuario (2026-10-06, conversación siguiente): rama a2** (reglas que no son de entrada), frente a a1 (el mismo método en ETH, XRP y BNB; K 30 → 36, ≈ 3,9 M hipótesis, descarga de datos). Se diseñó como **EXP-013**: tres reglas fijas de "comprado o en efectivo" revisadas una vez por día, comparadas contra mantener siempre la misma exposición promedio (así la suba de BTC no cuenta como mérito). El usuario autorizó el criterio de candidato adaptado (incluido el mínimo de 30 entradas) y **reiniciar en 0 el contador de experimentos seguidos sin avance** (los 8 de la línea de entradas quedan registrados). Detalle y reglas en la entrada EXP-013.
 - **Estado tras EXP-013 (propuesta; decide el usuario):** escenario A informativo. Ninguna de las tres reglas de "estar o no estar comprado" demuestra valor sobre mantener siempre la misma exposición. La de tendencia de 100 días (R2) es la observación más cercana a una señal de todo el proyecto, pero no es candidata (t 1,76 contra 3,05; pocos episodios largos; regla clásica, posiblemente influida por conocimiento previo). Opciones: (a) cerrar la línea de reglas técnicas simples sobre BTC 1h; (b) confirmar R2 tal cual, sin tocarla, en otros activos (requiere autorizar descarga de datos y costos; confirmación parcial porque esas criptos se mueven junto con BTC); (c) rama a1 con el método de entradas. Abrir el holdout para R2 no corresponde. Contador de experimentos seguidos sin avance (línea nueva): 1. Nada se ejecuta sin autorización.
 - **Decisión del usuario (2026-10-06): opción (b)**, confirmar R2 tal cual en ETH, XRP y BNB. Autorizó la descarga de esos tres pares de Binance, usar los mismos costos que en BTC y el criterio de decisión (K 33 → 36). Es **EXP-014**; detalle en su entrada.
+- **Estado tras EXP-014 (propuesta; decide el usuario):** R2 no se confirmó en ETH, XRP y BNB (combinado t +0,45; XRP en contra). Se cierra la rama a2. En 16 experimentos, ninguna regla basada sólo en precios pasados (entradas ni exposición) mostró ventaja fuera de muestra después de costos. Opciones: (a) cerrar la línea de reglas técnicas sobre precios en cripto y escribir la conclusión; (b) cambiar el tipo de información (p. ej., funding de futuros perpetuos, misma fuente pública de Binance; requiere autorización y diseño nuevo); (c) revisar el objetivo del proyecto. Contador de experimentos seguidos sin avance (línea nueva): 2. Nada se ejecuta sin autorización.
 - *Lección sobre horizontes largos:* en un activo con tendencia, el retorno bruto o neto absoluto de LONG crece con el horizonte aun sin ninguna señal (la línea base sin condición lo reproduce); sólo el lift contra la línea base de la misma ventana y geometría es interpretable. Y: el mínimo efectivo de operaciones es `max(30, 1 % de las barras del TRAIN)`; al cambiar la longitud del TRAIN hay que decidirlo explícitamente (EXP-012/012b).
 - *Decisiones tomadas por Claude que conviene que conozcas y puedas revertir:* (a) se enmendó el criterio de candidato a "t entre folds ≥ 3" (EXP-003); (b) se fijó en 1 % el ATR supuesto en las primeras velas del modelo de slippage (EXP-006); (c) se agregó la regla 7 (Bonferroni con la cuenta K).
 
@@ -91,8 +92,8 @@ Este archivo tiene cuatro partes (empezá por la 0 si no seguiste el trabajo):
 
 ### 0.5 Dónde está cada cosa
 - Bitácora detallada: sección 3 de este archivo. Resultados en `results/` (no se versiona).
-- Código: `trading_research/` (núcleo), `run_research.py` (búsqueda y walk-forward), `run_reality_check.py`, `run_pbo.py`, `run_lookahead.py`, `run_overlap_study.py`, `run_exposure.py` (EXP-013, reglas de exposición; módulo `trading_research/exposure.py`). Tests: `pixi run pytest -q`.
-- Datos: `D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv` (fuera del repo).
+- Código: `trading_research/` (núcleo), `run_research.py` (búsqueda y walk-forward), `run_reality_check.py`, `run_pbo.py`, `run_lookahead.py`, `run_overlap_study.py`, `run_exposure.py` (EXP-013, reglas de exposición; módulo `trading_research/exposure.py`), `run_exposure_confirm.py` (EXP-014, confirmación en otros activos). Tests: `pixi run pytest -q`.
+- Datos: `D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv` (fuera del repo); desde EXP-014 también `ETHUSDT_`, `XRPUSDT_` y `BNBUSDT_binance_1h.csv` en la misma carpeta (su tramo desde 2025-05-22 14:00 UTC es holdout).
 
 ### 0.6 Base metodológica vigente (fijada tras EXP-007, 2026-10-04)
 Todo experimento nuevo se evalúa con estas reglas; cambiarlas requiere registrar el motivo.
@@ -100,7 +101,7 @@ Todo experimento nuevo se evalúa con estas reglas; cambiarlas requiere registra
 - **`n_dropped_horizon` es el mecanismo de purga entre segmentos**: descarta toda señal cuyo horizonte se sale del segmento, de modo que ningún resultado de TRAIN usa precios de VALIDATION. Los tests verifican esa propiedad (`test_trade_label_window_stays_inside_segment`, `test_train_results_do_not_depend_on_future_prices`).
 - **El t entre operaciones es sólo descriptivo; nunca decide.** Decide el **t entre folds** junto con el **t HAC con 3H rezagos (`oos_hac_t_3H`)** (regla 4).
 - Corrección por varias variantes: **regla 7 y definición de K** (sección 2, "Aclaración de la regla 7 y definición de K"). Una sola corrección por familia (Reality Check *o* Bonferroni, no ambas).
-- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 13.831.770 al cierre de EXP-013 (13.831.500 al cierre de EXP-012b). K (variantes en el Reality Check) = 33 (30 antes de EXP-013). Experimentos seguidos sin avance: 1 (contador reiniciado por el usuario al cambiar de objeto de estudio tras EXP-012b, cuando iba en 8).
+- **El holdout sigue cerrado.** Contador acumulado de hipótesis (condiciones evaluadas): 13.832.030 al cierre de EXP-014 (13.831.770 al cierre de EXP-013; 13.831.500 al cierre de EXP-012b). K (variantes en el Reality Check) = 36 (33 antes de EXP-014; 30 antes de EXP-013). El holdout de ETH, XRP y BNB (desde 2025-05-22 14:00 UTC, la misma fecha que BTC) también está cerrado. Experimentos seguidos sin avance: 2 (contador reiniciado por el usuario al cambiar de objeto de estudio tras EXP-012b, cuando iba en 8).
 - Si se cambia la longitud de TRAIN, recordar que el mínimo efectivo de operaciones es `max(30, 1 % de las barras del TRAIN)` (lección de EXP-012). Toda feature nueva: test de causalidad por truncación/perturbación del futuro y `run_lookahead.py` (EXP-006).
 
 ---
@@ -241,9 +242,9 @@ operación i. Todo se expresa como fracción (0.01 = 1 %).
 | Concepto | Valor actual | ¿Entra en K? | Motivo |
 |---|---|---|---|
 | Condiciones individuales generadas | 7.500 por fold y lado | **No** | Se eligen con TRAIN y se miden en VALIDATION sin seleccionar por VALIDATION: la selección ya quedó dentro del procedimiento (EXP-003/004). |
-| Variantes / configuraciones (procedimientos completos) | 33 al cierre de EXP-013 (EXP-001, EXP-002, EXP-008-régimen, EXP-009-estructurada, las cuatro variantes ATR de EXP-010, EXP-011-4h, las tres variantes escaladas de EXP-012 y las tres de EXP-012b, cada una LONG/SHORT, más las tres reglas de exposición de EXP-013, sólo comprado/efectivo; eran 4 antes de EXP-008, 6 antes de EXP-009, 8 antes de EXP-010, 16 antes de EXP-011, 18 antes de EXP-012, 24 antes de EXP-012b y 30 antes de EXP-013) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
-| Experimentos | 15 (EXP-000 a EXP-013) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
-| Hipótesis acumuladas | 13.831.770 (al cierre de EXP-013) | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
+| Variantes / configuraciones (procedimientos completos) | 36 al cierre de EXP-014 (EXP-001, EXP-002, EXP-008-régimen, EXP-009-estructurada, las cuatro variantes ATR de EXP-010, EXP-011-4h, las tres variantes escaladas de EXP-012 y las tres de EXP-012b, cada una LONG/SHORT, más las tres reglas de exposición de EXP-013, sólo comprado/efectivo, más R2 en ETH, XRP y BNB de EXP-014, contadas como tres variantes aunque son otros activos; eran 4 antes de EXP-008, 6 antes de EXP-009, 8 antes de EXP-010, 16 antes de EXP-011, 18 antes de EXP-012, 24 antes de EXP-012b, 30 antes de EXP-013 y 33 antes de EXP-014) | **Sí: K** | Son las que se comparan contra el mismo OOS y entre las que se podría reportar "la mejor". |
+| Experimentos | 16 (EXP-000 a EXP-014) | **No** | Unidad de organización: un experimento puede tener 0, 1 o varias variantes, y variantes de experimentos distintos sobre los mismos datos compiten igual. |
+| Hipótesis acumuladas | 13.832.030 (al cierre de EXP-014) | **No** | Contador de transparencia sobre cuánto se exploró; no entra en ningún test porque esa exploración está absorbida en TRAIN. Usarlo en Bonferroni sobreestimaría la corrección en unos seis órdenes de magnitud. |
 | Universo conjunto del Reality Check | las K variantes con series OOS alineables | **Define K** | K = tamaño de ese universo. |
 Pertenece al universo de una variante si: (i) mismo activo, datos y timeframe; (ii) su serie OOS puede alinearse con las demás en la historia común (se usa la intersección); (iii) el investigador podría haber reportado esa variante como "el resultado". Si alguna de las tres no está clara, **no se decide arbitrariamente**: se documenta la duda en la entrada del experimento y se informa el Reality Check con y sin esa variante. Cada variante de una ablación (quitar una feature) cuenta si se mira su resultado OOS.
 
@@ -1152,6 +1153,77 @@ Además se informan, sin poder de decisión: los resultados por activo (t, HAC, 
 
 **Comando.** `pixi run python run_exposure_confirm.py --btc-csv "D:\O lol\Guardado de datos\BTCUSDT_binance_1h.csv" --asset ETHUSDT="D:\O lol\Guardado de datos\ETHUSDT_binance_1h.csv" --asset XRPUSDT=... --asset BNBUSDT=... --output results/exp014`.
 **Preparación hecha antes de bajar datos y correr.** Tests: 118 pasan (3 nuevos para EXP-014). Prueba en seco del script sobre tres paseos al azar sintéticos con inicios distintos y huecos (sin datos reales): corre de punta a punta, incluye 90/88/82 ventanas consecutivas y da "No confirmada" (t combinado −1,50: no inventa señal en ruido).
+
+
+**Resultados (2026-10-06).**
+*Datos y controles:*
+- Descarga autorizada desde data.binance.vision, con el mismo script que BTC. ETHUSDT: 79.957 velas desde 2017-08-17 04:00. XRPUSDT: 73.753 desde 2018-05-04 08:00. BNBUSDT: 78.021 desde 2017-11-06 03:00. Los tres archivos llegan hasta 2026-10-05 23:00 y están en `D:\O lol\Guardado de datos`.
+- Todo lo posterior a 2025-05-22 14:00 se recortó antes de calcular.
+- Ventanas incluidas, consecutivas hasta el final: ETH 90 (desde la 0), BNB 88 (desde la 2), XRP 82 (desde la 8).
+- Horas faltantes en el período evaluado: 120, 87 y 69.
+- Causalidad: **0 fallas** en 200 cortes por activo (truncar y perturbar).
+- Salida completa: `results/exp014/summary.json`, `windows_<par>.csv`, `pooled_windows.csv` y `results/exp014_stdout.txt`.
+
+Las sumas son simples, sin reinversión, como en EXP-013.
+
+| | ETH | XRP | BNB | *BTC (EXP-013, referencia)* |
+|---|---|---|---|---|
+| Exposición promedio ē | 53,9 % | 46,4 % | 55,7 % | *54,4 %* |
+| Entradas / duración media de cada tramo comprado | 53 / 660 h | 70 / 391 h | 63 / 560 h | *51 / 691 h* |
+| Comprar y mantener / benchmark (ē ×) | +425 / +229 % | +576 / +267 % | +723 / +402 % | *+397 / +216 %* |
+| Regla neto `typical` / `conservative` | +367 / +357 % | +92 / +76 % | +541 / +529 % | *+370 / +361 %* |
+| Lift bruto: suma · t · HAC | +151 pp · +1,15 · +1,13 | −158 pp · −1,04 · −1,02 | +155 pp · +1,12 · +1,09 | *+167 pp · +1,93 · +1,87* |
+| **Lift neto `typical`**: suma · t · HAC | +138 pp · **+1,04** · +1,02 | **−175 pp** · **−1,14** · −1,13 | +139 pp · **+0,99** · +0,98 | *+154 pp · +1,76 · +1,70* |
+| Lift neto `conservative`: suma · t | +128 pp · +0,96 | −191 pp · −1,24 | +127 pp · +0,90 | *+145 pp · +1,65* |
+| Ventanas con lift neto > 0 | 48/90 | 32/82 | 49/88 | *50/90* |
+| Tramos propios con lift neto > 0 | 3/5 | 1/5 | 4/5 | *5/5* |
+| Máxima caída: regla / benchmark / comprar y mantener | −110 / −121 / −224 % | −182 / −58 / −125 % | −124 / −75 / −134 % | *−79 / −68 / −125 %* |
+| Sharpe: regla / comprar y mantener | 0,75 / 0,65 | 0,17 / 0,81 | 1,10 / 1,12 | *1,01 / 0,76* |
+
+**Combinado** (promedio de los activos disponibles en cada una de las 90 ventanas de calendario; 64.800 h):
+- Lift neto medio por ventana +0,54 pp; **t +0,45**; HAC +0,44.
+- Bruto: t +0,60. `conservative`: suma +35 pp, t +0,32.
+- Tramos: +0,67 / −0,28 / +0,38 / −0,47 / +0,20, o sea **3/5 positivos**.
+
+**Correlación del lift neto por ventana** (informativa): ETH–BNB 0,55; ETH–XRP 0,17; XRP–BNB 0,23. Con R2 en BTC: ETH 0,38, BNB 0,31, XRP 0,04. La confirmación resultó menos dependiente de BTC de lo que se temía, sobre todo en XRP.
+**Reality Check** (informativo; 59.040 horas comunes a los tres): p = 0,26 (bloque de 1.200 h) y 0,23 (300 h). La mejor es BNB.
+
+**Reglas pre-registradas.**
+| Condición | Resultado |
+|---|---|
+| P1 (t combinado ≥ 3,08) | **No** (+0,45) |
+| P2 (HAC combinado ≥ 2) | **No** (+0,44) |
+| P3 (lift neto > 0 en cada activo) | **No**: XRP −175 pp |
+| P4 (≥ 4 de 5 tramos) | **No**: 3/5 |
+| P5 (`conservative` combinado > 0 y R2 gana en términos absolutos en cada activo) | Sí |
+| P6 (≥ 30 entradas por activo) | Sí: 53, 70 y 63 |
+
+Además, el t combinado es < 2. **Resultado: "No confirmada".**
+
+**Lectura.**
+- En ETH y BNB, R2 muestra el mismo signo que en BTC: lift positivo de ≈ +1,4 puntos de suma en 7 años, con t ≈ 1. Es más débil que en BTC y sin significancia.
+- En XRP va en contra: lift −1,75 y peor en 4 de sus 5 tramos.
+- Al promediar, el efecto casi desaparece (t +0,45). Lo que en BTC parecía un patrón estable (5/5 tramos) no se repite como tal en otras criptos del mismo período.
+- La lectura más simple es que el resultado de BTC fue, en buena parte, propio de su historia o del azar, como suele pasar con lo "mejor de varias reglas".
+- R2 tampoco mejora la máxima caída frente a la exposición constante: es peor en XRP, BNB y BTC y apenas mejor en ETH.
+
+**Cuentas.** Hipótesis de este experimento: **260** (90 + 82 + 88 ventanas); acumulado **13.832.030**. **K = 36.** Holdout cerrado en los cuatro activos. Contador de experimentos seguidos sin avance (línea nueva): **2**.
+**Decisión.**
+1. **R2 no se confirma** fuera de BTC. Según lo fijado antes de correr, se descarta como algo propio de BTC o como azar, y **se cierra la rama a2**.
+2. No se prueba ninguna variante (otros días de tendencia, otros activos, combinaciones). No se encadena EXP-015, el holdout sigue cerrado y no hay push.
+
+**Próximo paso (propuesta; decide el usuario).** Estado del proyecto:
+- 16 experimentos en total.
+- 8 buscaron entradas técnicas en BTC.
+- 2 probaron reglas de "estar o no estar comprado" (BTC y su confirmación).
+- Ninguna regla basada sólo en precios pasados mostró ventaja fuera de muestra después de costos.
+
+Opciones:
+- (a) **Cerrar la línea de reglas técnicas sobre precios en cripto** y escribir la conclusión del proyecto. Sería un resultado negativo bien documentado, con la infraestructura de validación lista para reutilizar.
+- (b) Cambiar el tipo de **información**, no la regla. Por ejemplo, el *funding rate* de los futuros perpetuos, que Binance publica en la misma fuente pública. Requiere autorización para datos nuevos y un diseño nuevo, y suma a K.
+- (c) Revisar el objetivo (opción (c) de la revisión de rumbo): por ejemplo, aceptar que la exposición pasiva es el punto de referencia y estudiar costos o gestión de riesgo en lugar de buscar ventaja.
+
+Nada se ejecuta sin autorización.
 
 ---
 
